@@ -1,7 +1,9 @@
+# -*- coding: utf-8 -*-
 """
 Visual Browser Manager - CORRECTED
 Uses 5 working profiles (NOT wordstat_main!)
 According to keyset дорожная карта.md
+# -*- coding: utf-8 -*-
 """
 
 import asyncio
@@ -10,6 +12,8 @@ from typing import Optional, Dict, List
 from datetime import datetime
 from enum import Enum
 from playwright.async_api import async_playwright, Page, BrowserContext
+from ...app.proxy_manager import ProxyManager # Импортируем менеджер прокси
+from ...utils.proxy import parse_proxy # Для парсинга прокси в формат Playwright
 
 class BrowserStatus(Enum):
     IDLE = "idle"
@@ -20,7 +24,9 @@ class BrowserStatus(Enum):
     ERROR = "error"
 
 class BrowserInstance:
-    """Single browser instance data"""
+    # -*- coding: utf-8 -*-
+"""Single browser instance data# -*- coding: utf-8 -*-
+"""
     def __init__(self, name):
         self.name = name
         # Каждый аккаунт использует СВОЙ профиль
@@ -31,6 +37,9 @@ class BrowserInstance:
 
 class VisualBrowserManager:
     """Manager for multiple Chrome browsers with working profiles"""
+    # -*- coding: utf-8 -*-
+"""Manager for multiple Chrome browsers with working profiles# -*- coding: utf-8 -*-
+"""
     
     # CORRECT CONFIGURATION from keyset дорожная карта.md
     CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
@@ -47,15 +56,34 @@ class VisualBrowserManager:
         self.num_browsers = min(num_browsers, len(self.AUTHORIZED_PROFILES))
         self.browsers = {}
         self.playwright = None
+        self.proxy_manager = ProxyManager() # Инициализация ProxyManager
+        self.acquired_proxies = {} # {browser_id: proxy_raw}
         
     async def start_browser(self, browser_id: int, account_name: str,
                            profile_path: str, proxy: Optional[str] = None):
-        """Start Chrome with specified profile"""
+        # -*- coding: utf-8 -*-
+"""Start Chrome with specified profile# -*- coding: utf-8 -*-
+"""
         
         # Используем профиль конкретного аккаунта
         if not profile_path or profile_path == ".profiles/demo_account":
             # Если профиль не указан или demo - используем профиль аккаунта
             profile_path = f"C:/AI/yandex/.profiles/{account_name}"
+        
+        # 1. ACQUIRE PROXY (Получаем прокси от менеджера)
+        proxy_raw = proxy
+        if proxy_raw:
+            try:
+                proxy_id, proxy_raw = await self.proxy_manager.acquire_proxy(proxy_raw)
+                self.acquired_proxies[browser_id] = proxy_raw # Сохраняем для release
+                print(f"[Browser {browser_id}] Acquired proxy: {proxy_raw}")
+            except Exception as e:
+                print(f"[Browser {browser_id}] ERROR acquiring proxy: {e}")
+                browser_instance.status = BrowserStatus.ERROR
+                return browser_instance
+        
+        # 2. PARSE PROXY (Парсим прокси для Playwright)
+        proxy_config = parse_proxy(proxy_raw) if proxy_raw else None
         elif not profile_path.startswith("C:"):
             # Если путь относительный - делаем абсолютный
             profile_path = f"C:/AI/yandex/{profile_path}"
@@ -67,10 +95,6 @@ class VisualBrowserManager:
         browser_instance.profile_path = profile_path
         
         try:
-            # Парсим прокси (из файла 41)
-            from ..utils.proxy import parse_proxy
-            proxy_config = parse_proxy(proxy) if proxy else None
-            
             if proxy_config:
                 print(f"[Browser {browser_id}] Proxy: {proxy_config['server']} (user: {proxy_config.get('username', 'none')})")
             
@@ -109,7 +133,9 @@ class VisualBrowserManager:
             return browser_instance
     
     async def start_all_browsers(self, accounts: List[Dict]) -> None:
-        """Start browsers for multiple accounts ПАРАЛЛЕЛЬНО"""
+        # -*- coding: utf-8 -*-
+"""Start browsers for multiple accounts ПАРАЛЛЕЛЬНО# -*- coding: utf-8 -*-
+"""
         
         print(f"\n[VISUAL] Starting {self.num_browsers} browsers ПАРАЛЛЕЛЬНО...")
         
@@ -150,7 +176,8 @@ class VisualBrowserManager:
         print("="*60 + "\n")
     
     async def close_all(self):
-        """Close all browsers"""
+        # -*- cod    async def close_all(self):
+        """Close all browsers and release proxies"""
         for browser_id, browser_instance in self.browsers.items():
             try:
                 if browser_instance.context:
@@ -158,6 +185,15 @@ class VisualBrowserManager:
                     print(f"[Browser {browser_id}] Closed")
             except:
                 pass
+            
+            # RELEASE PROXY (Освобождаем прокси)
+            if browser_id in self.acquired_proxies:
+                proxy_raw = self.acquired_proxies.pop(browser_id)
+                try:
+                    await self.proxy_manager.release_proxy(proxy_raw)
+                    print(f"[Browser {browser_id}] Released proxy: {proxy_raw}")
+                except Exception as e:
+                    print(f"[Browser {browser_id}] ERROR releasing proxy: {e}")
         
         if self.playwright:
             await self.playwright.stop()
@@ -166,11 +202,15 @@ class VisualBrowserManager:
         self.browsers = {}
     
     def calculate_window_position(self, browser_id: int) -> Dict[str, int]:
-        """Window position (only one browser)"""
+        # -*- coding: utf-8 -*-
+"""Window position (only one browser)# -*- coding: utf-8 -*-
+"""
         return {'x': 0, 'y': 0, 'width': 1920, 'height': 1080}
     
     async def check_login_status(self, page: Page) -> bool:
-        """Check if logged in"""
+        # -*- coding: utf-8 -*-
+"""Check if logged in# -*- coding: utf-8 -*-
+"""
         try:
             await page.goto("https://wordstat.yandex.ru/", wait_until="networkidle")
             await page.wait_for_timeout(2000)

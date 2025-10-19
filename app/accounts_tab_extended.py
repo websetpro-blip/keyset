@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Расширенная вкладка управления аккаунтами с функцией логина
 
@@ -5,6 +6,7 @@
 - Не удалять рабочие функции
 - Не изменять работающую логику
 - Не трогать то, что пользователь не просил менять
+# -*- coding: utf-8 -*-
 """
 
 import asyncio
@@ -35,7 +37,9 @@ PROFILE_OPTIONS_ROLE = Qt.UserRole + 101
 
 
 class ProfileComboDelegate(QStyledItemDelegate):
-    """Делегат для редактирования профилей аккаунтов (ComboBox)."""
+    # -*- coding: utf-8 -*-
+"""Делегат для редактирования профилей аккаунтов (ComboBox).# -*- coding: utf-8 -*-
+"""
 
     def createEditor(self, parent, option, index):
         editor = QComboBox(parent)
@@ -73,7 +77,9 @@ class ProfileComboDelegate(QStyledItemDelegate):
 
 
 class AutoLoginThread(QThread):
-    """Поток для автоматической авторизации аккаунта"""
+    # -*- coding: utf-8 -*-
+"""Поток для автоматической авторизации аккаунта# -*- coding: utf-8 -*-
+"""
     status_signal = Signal(str)  # Статус операции
     progress_signal = Signal(int)  # Прогресс 0-100
     secret_question_signal = Signal(str, str)  # account_name, question_text
@@ -85,11 +91,15 @@ class AutoLoginThread(QThread):
         self.secret_answer = None
         
     def set_secret_answer(self, answer):
-        """Установить ответ на секретный вопрос"""
+        # -*- coding: utf-8 -*-
+"""Установить ответ на секретный вопрос# -*- coding: utf-8 -*-
+"""
         self.secret_answer = answer
         
     def run(self):
-        """Запуск умного автологина на основе решения GPT"""
+        # -*- coding: utf-8 -*-
+"""Запуск умного автологина на основе решения GPT# -*- coding: utf-8 -*-
+"""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -118,7 +128,7 @@ class AutoLoginThread(QThread):
             self.finished_signal.emit(False, "Профиль не указан в БД")
             return
 
-        self.status_signal.emit(f"[OK] Профиль РёР· Р'Р]: {profile_path}")
+        self.status_signal.emit(f"[OK] Профиль из БД: {profile_path}")
 
         if not profile_path.startswith("C:"):
             profile_path = f"C:/AI/yandex/{profile_path}"
@@ -181,7 +191,9 @@ class AutoLoginThread(QThread):
 
 
 class LoginWorkerThread(QThread):
-    """Поток для логина в браузеры"""
+    # -*- coding: utf-8 -*-
+"""Поток для логина в браузеры# -*- coding: utf-8 -*-
+"""
     progress_signal = Signal(str)  # Сообщение о прогрессе
     account_logged_signal = Signal(int, bool, str)  # account_id, success, message
     finished_signal = Signal(bool, str)  # success, message
@@ -194,7 +206,9 @@ class LoginWorkerThread(QThread):
         self.visual_mode = visual_mode  # Визуальный режим - всегда открывать браузеры
         
     def run(self):
-        """Запуск логина в отдельном потоке"""
+        # -*- coding: utf-8 -*-
+"""Запуск логина в отдельном потоке# -*- coding: utf-8 -*-
+"""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -211,7 +225,9 @@ class LoginWorkerThread(QThread):
             loop.close()
     
     async def _run_async(self):
-        """Логин в аккаунты"""
+        # -*- coding: utf-8 -*-
+"""Логин в аккаунты# -*- coding: utf-8 -*-
+"""
         from ..workers.auth_checker import AuthChecker
         
         # Отладка - показываем сколько аккаунтов получили
@@ -318,7 +334,9 @@ class LoginWorkerThread(QThread):
 
 
 class AccountsTabExtended(QWidget):
-    """Расширенная вкладка аккаунтов с функцией логина"""
+    # -*- coding: utf-8 -*-
+"""Расширенная вкладка аккаунтов с функцией логина# -*- coding: utf-8 -*-
+"""
     accounts_changed = Signal()
     
     def __init__(self):
@@ -328,7 +346,9 @@ class AccountsTabExtended(QWidget):
         self.setup_ui()
         
     def setup_ui(self):
-        """Создание интерфейса"""
+        # -*- coding: utf-8 -*-
+"""Создание интерфейса# -*- coding: utf-8 -*-
+"""
         layout = QVBoxLayout(self)
         
         # Верхняя панель с кнопками управления
@@ -359,7 +379,8 @@ class AccountsTabExtended(QWidget):
         self.login_btn = QPushButton("🔐 Войти")
         self.login_btn.clicked.connect(self.login_selected)
         self.login_btn.setEnabled(False)
-        self.login_btn.setStyleSheet("""
+        self.login_btn.setStyleSheet(# -*- coding: utf-8 -*-
+"""
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
@@ -372,14 +393,16 @@ class AccountsTabExtended(QWidget):
             QPushButton:disabled {
                 background-color: #cccccc;
             }
-        """)
+        # -*- coding: utf-8 -*-
+""")
         buttons_layout.addWidget(self.login_btn)
         
         # Кнопка автоматического логина
         self.auto_login_btn = QPushButton("Автологин")
         self.auto_login_btn.clicked.connect(self.auto_login_selected)
         self.auto_login_btn.setEnabled(False)
-        self.auto_login_btn.setStyleSheet("""
+        self.auto_login_btn.setStyleSheet(# -*- coding: utf-8 -*-
+"""
             QPushButton {
                 background-color: #FF9800;
                 color: white;
@@ -392,13 +415,15 @@ class AccountsTabExtended(QWidget):
             QPushButton:disabled {
                 background-color: #cccccc;
             }
-        """)
+        # -*- coding: utf-8 -*-
+""")
         self.auto_login_btn.setToolTip("Автоматическая авторизация с вводом логина и пароля")
         buttons_layout.addWidget(self.auto_login_btn)
         
         self.login_all_btn = QPushButton("🔐 Войти во все")
         self.login_all_btn.clicked.connect(self.launch_browsers_cdp)
-        self.login_all_btn.setStyleSheet("""
+        self.login_all_btn.setStyleSheet(# -*- coding: utf-8 -*-
+"""
             QPushButton {
                 background-color: #2196F3;
                 color: white;
@@ -408,7 +433,8 @@ class AccountsTabExtended(QWidget):
             QPushButton:hover {
                 background-color: #0976d2;
             }
-        """)
+        # -*- coding: utf-8 -*-
+""")
         buttons_layout.addWidget(self.login_all_btn)
         
         self.refresh_btn = QPushButton("🔄 Обновить")
@@ -420,7 +446,8 @@ class AccountsTabExtended(QWidget):
         self.test_proxy_btn.clicked.connect(self.open_proxy_manager)
         self.test_proxy_btn.setEnabled(True)  # Всегда доступна
         self.test_proxy_btn.setToolTip("Открыть Proxy Manager для массовой проверки")
-        self.test_proxy_btn.setStyleSheet("""
+        self.test_proxy_btn.setStyleSheet(# -*- coding: utf-8 -*-
+"""
             QPushButton {
                 background-color: #9C27B0;
                 color: white;
@@ -433,14 +460,16 @@ class AccountsTabExtended(QWidget):
             QPushButton:disabled {
                 background-color: #cccccc;
             }
-        """)
+        # -*- coding: utf-8 -*-
+""")
         buttons_layout.addWidget(self.test_proxy_btn)
         
         # Кнопка проверки баланса капчи
         self.check_captcha_btn = QPushButton("🎫 Баланс капчи")
         self.check_captcha_btn.clicked.connect(self.check_captcha_balance)
         self.check_captcha_btn.setToolTip("Проверить баланс RuCaptcha")
-        self.check_captcha_btn.setStyleSheet("""
+        self.check_captcha_btn.setStyleSheet(# -*- coding: utf-8 -*-
+"""
             QPushButton {
                 background-color: #FF5722;
                 color: white;
@@ -450,7 +479,8 @@ class AccountsTabExtended(QWidget):
             QPushButton:hover {
                 background-color: #E64A19;
             }
-        """)
+        # -*- coding: utf-8 -*-
+""")
         buttons_layout.addWidget(self.check_captcha_btn)
         
         layout.addLayout(buttons_layout)
@@ -541,7 +571,9 @@ class AccountsTabExtended(QWidget):
         self.refresh()
     
     def toggle_select_all(self, state):
-        """Переключить выбор всех аккаунтов"""
+        # -*- coding: utf-8 -*-
+"""Переключить выбор всех аккаунтов# -*- coding: utf-8 -*-
+"""
         for row in range(self.table.rowCount()):
             checkbox = self.table.cellWidget(row, 0)
             if checkbox:
@@ -549,14 +581,18 @@ class AccountsTabExtended(QWidget):
         self.log_action(f"{'Выбраны' if state == 2 else 'Сняты'} все аккаунты")
     
     def log_action(self, message):
-        """Добавить сообщение в главный журнал (файл 45)"""
+        # -*- coding: utf-8 -*-
+"""Добавить сообщение в главный журнал (файл 45)# -*- coding: utf-8 -*-
+"""
         # Логируем через главное окно
         main_window = self.window()
         if hasattr(main_window, 'log_message'):
             main_window.log_message(message, "INFO")
     
     def _selected_rows(self) -> List[int]:
-        """Получить выбранные строки"""
+        # -*- coding: utf-8 -*-
+"""Получить выбранные строки# -*- coding: utf-8 -*-
+"""
         selected = []
         for row in range(self.table.rowCount()):
             checkbox = self.table.cellWidget(row, 0)
@@ -565,14 +601,18 @@ class AccountsTabExtended(QWidget):
         return selected
     
     def _current_account(self) -> Optional[Any]:
-        """Получить текущий выбранный аккаунт"""
+        # -*- coding: utf-8 -*-
+"""Получить текущий выбранный аккаунт# -*- coding: utf-8 -*-
+"""
         row = self.table.currentRow()
         if 0 <= row < len(self._accounts):
             return self._accounts[row]
         return None
     
     def _update_buttons(self):
-        """Обновить состояние кнопок"""
+        # -*- coding: utf-8 -*-
+"""Обновить состояние кнопок# -*- coding: utf-8 -*-
+"""
         has_selection = self._current_account() is not None
         self.edit_btn.setEnabled(has_selection)
         self.delete_btn.setEnabled(has_selection)
@@ -585,7 +625,9 @@ class AccountsTabExtended(QWidget):
         # self.test_proxy_btn.setEnabled(True)  # Убрали, т.к. всегда True
     
     def refresh(self):
-        """Обновить таблицу аккаунтов"""
+        # -*- coding: utf-8 -*-
+"""Обновить таблицу аккаунтов# -*- coding: utf-8 -*-
+"""
         # Получаем аккаунты и фильтруем demo_account и wordstat_main (это профиль, а не аккаунт)
         all_accounts = account_service.list_accounts()
         self._accounts = [acc for acc in all_accounts if acc.name not in ["demo_account", "wordstat_main"]]
@@ -631,14 +673,18 @@ class AccountsTabExtended(QWidget):
         self._update_buttons()
 
     def _profile_options(self, account):
-        """Сформировать список доступных профилей для аккаунта."""
+        # -*- coding: utf-8 -*-
+"""Сформировать список доступных профилей для аккаунта.# -*- coding: utf-8 -*-
+"""
         options = [(account.name, f"{account.name} (личный)")]
         if account.name != "wordstat_main":
             options.append(("wordstat_main", "wordstat_main (общий)"))
         return options
 
     def _profile_value_from_account(self, account):
-        """Определить текущий профиль из пути аккаунта."""
+        # -*- coding: utf-8 -*-
+"""Определить текущий профиль из пути аккаунта.# -*- coding: utf-8 -*-
+"""
         if not account.profile_path:
             return account.name
         profile_name = Path(account.profile_path).name
@@ -648,14 +694,18 @@ class AccountsTabExtended(QWidget):
 
     @staticmethod
     def _profile_label(options, value):
-        """Получить отображаемую подпись для значения профиля."""
+        # -*- coding: utf-8 -*-
+"""Получить отображаемую подпись для значения профиля.# -*- coding: utf-8 -*-
+"""
         for option_value, label in options:
             if option_value == value:
                 return label
         return value
     
     def _get_status_label(self, status):
-        """Получить метку статуса"""
+        # -*- coding: utf-8 -*-
+"""Получить метку статуса# -*- coding: utf-8 -*-
+"""
         labels = {
             "ok": "Готов",
             "cooldown": "Пауза",
@@ -667,7 +717,9 @@ class AccountsTabExtended(QWidget):
         return labels.get(status, status)
     
     def _get_login_status(self, account):
-        """Проверить статус логина"""
+        # -*- coding: utf-8 -*-
+"""Проверить статус логина# -*- coding: utf-8 -*-
+"""
         # Проверяем наличие cookies в профиле
         profile_path = Path(account.profile_path)
         cookies_file = profile_path / "Default" / "Cookies"
@@ -684,18 +736,24 @@ class AccountsTabExtended(QWidget):
         return "❌ Не залогинен"
     
     def _is_logged_in(self, account):
-        """Проверить залогинен ли аккаунт"""
+        # -*- coding: utf-8 -*-
+"""Проверить залогинен ли аккаунт# -*- coding: utf-8 -*-
+"""
         # Всегда возвращаем False чтобы реально проверить через Wordstat
         return False
     
     def _format_timestamp(self, ts):
-        """Форматировать временную метку"""
+        # -*- coding: utf-8 -*-
+"""Форматировать временную метку# -*- coding: utf-8 -*-
+"""
         if ts:
             return ts.strftime("%Y-%m-%d %H:%M")
         return ""
     
     def _get_auth_status(self, account):
-        """Получить статус авторизации"""
+        # -*- coding: utf-8 -*-
+"""Получить статус авторизации# -*- coding: utf-8 -*-
+"""
         # Проверяем куки в выбранном профиле
         profile_path = account.profile_path or f"C:/AI/yandex/.profiles/{account.name}"
         
@@ -718,7 +776,9 @@ class AccountsTabExtended(QWidget):
         return "Не залогинен"
     
     def _format_proxy(self, proxy):
-        """Форматировать прокси для отображения"""
+        # -*- coding: utf-8 -*-
+"""Форматировать прокси для отображения# -*- coding: utf-8 -*-
+"""
         if not proxy:
             return "No proxy"
         
@@ -738,7 +798,9 @@ class AccountsTabExtended(QWidget):
         return str(proxy)[:20] + "..."
     
     def _get_activity_status(self, account):
-        """Получить статус активности аккаунта"""
+        # -*- coding: utf-8 -*-
+"""Получить статус активности аккаунта# -*- coding: utf-8 -*-
+"""
         # Проверяем cookies для определения активности
         profile_path = Path(account.profile_path if account.profile_path else f".profiles/{account.name}")
         cookies_file = profile_path / "Default" / "Cookies"
@@ -762,7 +824,9 @@ class AccountsTabExtended(QWidget):
             return "Не использован"
     
     def add_account(self):
-        """Добавить новый аккаунт"""
+        # -*- coding: utf-8 -*-
+"""Добавить новый аккаунт# -*- coding: utf-8 -*-
+"""
         from ..app.main import AccountDialog
         
         dialog = AccountDialog(self)
@@ -778,7 +842,9 @@ class AccountsTabExtended(QWidget):
                     QMessageBox.warning(self, "Ошибка", str(e))
     
     def edit_account(self):
-        """Редактировать аккаунт"""
+        # -*- coding: utf-8 -*-
+"""Редактировать аккаунт# -*- coding: utf-8 -*-
+"""
         account = self._current_account()
         if not account:
             return
@@ -820,7 +886,9 @@ class AccountsTabExtended(QWidget):
                     QMessageBox.warning(self, "Ошибка", str(e))
     
     def delete_account(self):
-        """Удалить аккаунт"""
+        # -*- coding: utf-8 -*-
+"""Удалить аккаунт# -*- coding: utf-8 -*-
+"""
         account = self._current_account()
         if not account:
             return
@@ -863,7 +931,9 @@ class AccountsTabExtended(QWidget):
                 QMessageBox.warning(self, "Ошибка", str(e))
     
     def import_accounts(self):
-        """Импортировать аккаунты из файла"""
+        # -*- coding: utf-8 -*-
+"""Импортировать аккаунты из файла# -*- coding: utf-8 -*-
+"""
         filename, _ = QFileDialog.getOpenFileName(
             self,
             "Выберите файл с аккаунтами",
@@ -879,7 +949,9 @@ class AccountsTabExtended(QWidget):
                 QMessageBox.warning(self, "Ошибка импорта", str(e))
     
     def test_proxy_selected(self):
-        """Проверить прокси выбранного аккаунта"""
+        # -*- coding: utf-8 -*-
+"""Проверить прокси выбранного аккаунта# -*- coding: utf-8 -*-
+"""
         account = self._current_account()
         if not account:
             QMessageBox.warning(self, "Внимание", "Выберите аккаунт для проверки прокси")
@@ -946,7 +1018,9 @@ class AccountsTabExtended(QWidget):
             self.log_action(f"Прокси {account.proxy} НЕ работает: {result['error']}")
     
     def open_proxy_manager(self):
-        """Открыть Proxy Manager (немодальное окно)"""
+        # -*- coding: utf-8 -*-
+"""Открыть Proxy Manager (немодальное окно)# -*- coding: utf-8 -*-
+"""
         from .proxy_manager import ProxyManagerDialog
         
         # Создаем и показываем окно
@@ -956,7 +1030,9 @@ class AccountsTabExtended(QWidget):
         self.log_action("Открыт Proxy Manager")
     
     def check_captcha_balance(self):
-        """Проверить баланс RuCaptcha"""
+        # -*- coding: utf-8 -*-
+"""Проверить баланс RuCaptcha# -*- coding: utf-8 -*-
+"""
         # Пока используем общий ключ из файла
         # TODO: В будущем брать ключ из поля captcha_key аккаунта
         CAPTCHA_KEY = "8f00b4cb9b77d982abb77260a168f976"
@@ -1021,7 +1097,9 @@ class AccountsTabExtended(QWidget):
             self.log_action(f"RuCaptcha ошибка: {result['error']}")
     
     def login_selected(self):
-        """Открыть Chrome с CDP для ручного логина"""
+        # -*- coding: utf-8 -*-
+"""Открыть Chrome с CDP для ручного логина# -*- coding: utf-8 -*-
+"""
         selected_rows = self._selected_rows()
         if not selected_rows:
             QMessageBox.warning(self, "Внимание", "Выберите аккаунты для логина")
@@ -1072,7 +1150,9 @@ class AccountsTabExtended(QWidget):
         self.log_action(f"Открыто Chrome с CDP для ручного логина: {len(selected_rows)}")
     
     def auto_login_selected(self):
-        """Автоматическая авторизация ВЫБРАННЫХ аккаунтов (где стоят галочки)"""
+        # -*- coding: utf-8 -*-
+"""Автоматическая авторизация ВЫБРАННЫХ аккаунтов (где стоят галочки)# -*- coding: utf-8 -*-
+"""
         # Берем только выбранные аккаунты
         selected_rows = self._selected_rows()
         
@@ -1115,7 +1195,9 @@ class AccountsTabExtended(QWidget):
         self.log_action(f"Запуск автологина для {account.name}...")
     
     def _handle_secret_question(self, account_name: str, question_text: str):
-        """Обработка секретного вопроса"""
+        # -*- coding: utf-8 -*-
+"""Обработка секретного вопроса# -*- coding: utf-8 -*-
+"""
         from PySide6.QtWidgets import QInputDialog
         
         # Показываем диалог для ввода ответа
@@ -1132,13 +1214,17 @@ class AccountsTabExtended(QWidget):
                 self.auto_login_thread.set_secret_answer(answer)
     
     def _update_progress(self, value: int):
-        """Обновление прогресса"""
+        # -*- coding: utf-8 -*-
+"""Обновление прогресса# -*- coding: utf-8 -*-
+"""
         # Если есть прогресс-бар, обновляем его
         if hasattr(self, 'progress_bar'):
             self.progress_bar.setValue(value)
     
     def _on_auto_login_finished(self, success: bool, message: str):
-        """Обработка завершения автологина"""
+        # -*- coding: utf-8 -*-
+"""Обработка завершения автологина# -*- coding: utf-8 -*-
+"""
         # Включаем кнопку обратно
         self.auto_login_btn.setEnabled(True)
         
@@ -1151,7 +1237,9 @@ class AccountsTabExtended(QWidget):
             QMessageBox.warning(self, "Ошибка автологина", message)
     
     def launch_browsers_cdp(self):
-        """Открыть браузеры для парсинга с CDP портами БЕЗ АВТОЛОГИНА!"""
+        # -*- coding: utf-8 -*-
+"""Открыть браузеры для парсинга с CDP портами БЕЗ АВТОЛОГИНА!# -*- coding: utf-8 -*-
+"""
         import subprocess
         import time
         from pathlib import Path
@@ -1276,7 +1364,9 @@ class AccountsTabExtended(QWidget):
             QMessageBox.warning(self, "Ошибка", "Не удалось запустить браузеры")
     
     def login_all(self):
-        """Автологин для новых аккаунтов - последовательная авторизация"""
+        # -*- coding: utf-8 -*-
+"""Автологин для новых аккаунтов - последовательная авторизация# -*- coding: utf-8 -*-
+"""
         if not self._accounts:
             QMessageBox.warning(self, "Внимание", "Нет аккаунтов для логина")
             return
@@ -1297,7 +1387,9 @@ class AccountsTabExtended(QWidget):
             self._login_next_account()
     
     def _login_next_account(self):
-        """Логин в следующий аккаунт из списка"""
+        # -*- coding: utf-8 -*-
+"""Логин в следующий аккаунт из списка# -*- coding: utf-8 -*-
+"""
         if self._current_login_index >= len(self._accounts):
             # Все аккаунты обработаны
             self.log_action("✅ Авторизация всех аккаунтов завершена!")
@@ -1315,7 +1407,9 @@ class AccountsTabExtended(QWidget):
         self.auto_login_thread.start()
     
     def _on_account_login_finished(self, success: bool, message: str):
-        """Обработка завершения логина одного аккаунта"""
+        # -*- coding: utf-8 -*-
+"""Обработка завершения логина одного аккаунта# -*- coding: utf-8 -*-
+"""
         account = self._accounts[self._current_login_index]
         
         if success:
@@ -1330,7 +1424,9 @@ class AccountsTabExtended(QWidget):
         QTimer.singleShot(2000, self._login_next_account)
     
     def _start_login(self, accounts, headless=False, visual_mode=False):
-        """Запустить процесс логина"""
+        # -*- coding: utf-8 -*-
+"""Запустить процесс логина# -*- coding: utf-8 -*-
+"""
         if self.login_thread and self.login_thread.isRunning():
             QMessageBox.warning(self, "Внимание", "Процесс логина уже запущен")
             return
@@ -1354,11 +1450,15 @@ class AccountsTabExtended(QWidget):
         self.log_action(f"Запуск {len(accounts)} браузеров...")
     
     def on_login_progress(self, message):
-        """Обработка прогресса логина"""
+        # -*- coding: utf-8 -*-
+"""Обработка прогресса логина# -*- coding: utf-8 -*-
+"""
         self.log_action(message)
     
     def on_account_logged(self, account_id, success, message):
-        """Обработка логина конкретного аккаунта"""
+        # -*- coding: utf-8 -*-
+"""Обработка логина конкретного аккаунта# -*- coding: utf-8 -*-
+"""
         # Обновляем статус в БД
         if success:
             account_service.mark_ok(account_id)
@@ -1367,7 +1467,9 @@ class AccountsTabExtended(QWidget):
         self.refresh()
     
     def on_login_finished(self, success, message):
-        """Обработка завершения логина"""
+        # -*- coding: utf-8 -*-
+"""Обработка завершения логина# -*- coding: utf-8 -*-
+"""
         self.login_progress.setVisible(False)
         self.login_btn.setEnabled(True)
         self.login_all_btn.setEnabled(True)
@@ -1381,7 +1483,9 @@ class AccountsTabExtended(QWidget):
         self.refresh()
     
     def open_browsers_for_login(self):
-        """Открыть браузеры только для тех аккаунтов где нужен логин"""
+        # -*- coding: utf-8 -*-
+"""Открыть браузеры только для тех аккаунтов где нужен логин# -*- coding: utf-8 -*-
+"""
         from pathlib import Path
         
         # Фильтруем аккаунты которые требуют логина
@@ -1430,14 +1534,18 @@ class AccountsTabExtended(QWidget):
             self._start_login(all_accounts, visual_mode=True)
     
     def show_browser_status(self):
-        """Показать статус браузеров"""
+        # -*- coding: utf-8 -*-
+"""Показать статус браузеров# -*- coding: utf-8 -*-
+"""
         if hasattr(self, 'browser_manager') and self.browser_manager:
             self.browser_manager.show_status()
         else:
             QMessageBox.information(self, "Статус", "Браузеры не запущены")
     
     def update_browser_status(self):
-        """Обновить статусы залогинены ли браузеры"""
+        # -*- coding: utf-8 -*-
+"""Обновить статусы залогинены ли браузеры# -*- coding: utf-8 -*-
+"""
         if hasattr(self, 'browser_manager') and self.browser_manager:
             QMessageBox.information(self, "Статус", "Проверка статусов...")
             # TODO: реализовать проверку через browser_manager
@@ -1445,7 +1553,9 @@ class AccountsTabExtended(QWidget):
             QMessageBox.warning(self, "Внимание", "Браузеры не запущены")
     
     def minimize_all_browsers(self):
-        """Минимизировать все браузеры"""
+        # -*- coding: utf-8 -*-
+"""Минимизировать все браузеры# -*- coding: utf-8 -*-
+"""
         if hasattr(self, 'browser_manager') and self.browser_manager:
             try:
                 # TODO: реализовать минимизацию в browser_manager
@@ -1456,7 +1566,9 @@ class AccountsTabExtended(QWidget):
             QMessageBox.warning(self, "Внимание", "Браузеры не запущены")
     
     def close_all_browsers(self):
-        """Закрыть все браузеры"""
+        # -*- coding: utf-8 -*-
+"""Закрыть все браузеры# -*- coding: utf-8 -*-
+"""
         if hasattr(self, 'browser_manager') and self.browser_manager:
             reply = QMessageBox.question(self, "Подтверждение",
                 "Закрыть все браузеры?",
@@ -1476,7 +1588,9 @@ class AccountsTabExtended(QWidget):
             QMessageBox.information(self, "Информация", "Браузеры не запущены")
     
     def on_table_double_click(self, item):
-        """Обработчик двойного клика по ячейке таблицы"""
+        # -*- coding: utf-8 -*-
+"""Обработчик двойного клика по ячейке таблицы# -*- coding: utf-8 -*-
+"""
         column = self.table.currentColumn()
         
         # Если клик по колонке "Куки" (индекс 7)
@@ -1486,7 +1600,9 @@ class AccountsTabExtended(QWidget):
             self.edit_account()
     
     def edit_cookies(self):
-        """Редактировать куки для аккаунта"""
+        # -*- coding: utf-8 -*-
+"""Редактировать куки для аккаунта# -*- coding: utf-8 -*-
+"""
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QDialogButtonBox, QLabel
         
         # Путь к профилю wordstat_main
@@ -1500,7 +1616,8 @@ class AccountsTabExtended(QWidget):
         layout = QVBoxLayout(dialog)
         
         # Информация
-        info = QLabel("""
+        info = QLabel(# -*- coding: utf-8 -*-
+"""
 <b>Важные куки для Wordstat:</b><br>
 • sessionid2 - основная сессия<br>
 • yandex_login - логин пользователя<br>
@@ -1509,7 +1626,8 @@ class AccountsTabExtended(QWidget):
 <br>
 <b>Профиль:</b> wordstat_main<br>
 <b>Путь:</b> C:\\AI\\yandex\\.profiles\\wordstat_main\\
-        """)
+        # -*- coding: utf-8 -*-
+""")
         layout.addWidget(info)
         
         # Поле для ввода куков
@@ -1540,14 +1658,18 @@ class AccountsTabExtended(QWidget):
                 "и войдите в Яндекс вручную или используйте кнопку 'Автологин'")
     
     def _update_profile(self, account_id, profile_key):
-        """Обновить профиль для аккаунта"""
+        # -*- coding: utf-8 -*-
+"""Обновить профиль для аккаунта# -*- coding: utf-8 -*-
+"""
         profile_name = profile_key or "wordstat_main"
         profile_path = f"C:/AI/yandex/.profiles/{profile_name}"
         account_service.update_account(account_id, profile_path=profile_path)
         print(f"[Accounts] Профиль для аккаунта {account_id} изменен на {profile_name}")
 
     def _handle_item_changed(self, item):
-        """Отслеживаем изменение профиля через делегат."""
+        # -*- coding: utf-8 -*-
+"""Отслеживаем изменение профиля через делегат.# -*- coding: utf-8 -*-
+"""
         if item.column() != PROFILE_SELECT_COLUMN or not self._accounts:
             return
         row = item.row()
@@ -1565,13 +1687,17 @@ class AccountsTabExtended(QWidget):
         self._update_profile(account.id, profile_value)
         
     def on_table_double_click(self, row, col):
-        """Обработка двойного клика по таблице"""
+        # -*- coding: utf-8 -*-
+"""Обработка двойного клика по таблице# -*- coding: utf-8 -*-
+"""
         # Если кликнули по колонке куков - открываем диалог редактирования
         if col == 8:  # Колонка куков
             self.edit_cookies(row)
             
     def edit_cookies(self, row):
-        """Редактировать куки для аккаунта"""
+        # -*- coding: utf-8 -*-
+"""Редактировать куки для аккаунта# -*- coding: utf-8 -*-
+"""
         account = self._accounts[row]
         profile_path = account.profile_path or f"C:/AI/yandex/.profiles/{account.name}"
         
@@ -1587,10 +1713,12 @@ class AccountsTabExtended(QWidget):
         msg.setWindowTitle(f"Куки для {account.name}")
         msg.setIcon(QMessageBox.Information)
         
-        text = f"""
+        text = f# -*- coding: utf-8 -*-
+"""
 Профиль: {profile_path.split('/')[-1]}
 Путь к куками: {cookies_file}
 
+# -*- coding: utf-8 -*-
 """
         
         if cookies_file.exists():
@@ -1599,7 +1727,8 @@ class AccountsTabExtended(QWidget):
             from datetime import datetime
             age_days = (datetime.now().timestamp() - stat.st_mtime) / 86400
             
-            text += f"""Размер файла: {size_kb:.1f} KB
+            text += f# -*- coding: utf-8 -*-
+"""Размер файла: {size_kb:.1f} KB
 Последнее изменение: {int(age_days)} дней назад
 
 Важные куки для Wordstat:
@@ -1607,6 +1736,7 @@ class AccountsTabExtended(QWidget):
 • yandex_login - Логин пользователя  
 • yandexuid - ID пользователя
 • L - Токен авторизации
+# -*- coding: utf-8 -*-
 """
         else:
             text += "Файл куков не найден!\n\nЧтобы добавить куки:\n1. Откройте Chrome с этим профилем\n2. Войдите в Яндекс\n3. Куки сохранятся автоматически"
@@ -1615,7 +1745,9 @@ class AccountsTabExtended(QWidget):
         msg.exec()
             
     def open_chrome_with_profile(self):
-        """Открыть Chrome с профилем выбранного аккаунта"""
+        # -*- coding: utf-8 -*-
+"""Открыть Chrome с профилем выбранного аккаунта# -*- coding: utf-8 -*-
+"""
         import subprocess
         
         selected = self._selected_rows()
@@ -1653,7 +1785,9 @@ class AccountsTabExtended(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Не удалось запустить Chrome: {str(e)}")
         
     def _get_cookies_status(self, account):
-        """Получить статус куков для аккаунта (используем функцию из файла 42)"""
+        # -*- coding: utf-8 -*-
+"""Получить статус куков для аккаунта (используем функцию из файла 42)# -*- coding: utf-8 -*-
+"""
         # Используем функцию get_cookies_status() из services/accounts.py
         return get_cookies_status(account)
 

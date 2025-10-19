@@ -1,19 +1,22 @@
+# -*- coding: utf-8 -*-
 """
 ТУРБО ПАРСЕР ИНТЕГРАЦИЯ ДЛЯ SEMTOOL
 Интегрирует наш парсер 195.9 фраз/мин в KeySet
 Основан на parser_final_130plus.py + рекомендации GPT
+# -*- coding: utf-8 -*-
 """
 
 import asyncio
 import time
 import json
 import random
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from urllib.parse import quote
 
-from playwright.async_api import async_playwright, Page, Browser, BrowserContext
+from playwright.async_api import async_playwright, Page, BrowserContext
 import sqlite3
 
 from ..core.db import SessionLocal
@@ -23,7 +26,9 @@ from .auto_auth_handler import AutoAuthHandler
 
 
 class AIMDController:
-    """AIMD регулятор скорости для избежания банов"""
+    # -*- coding: utf-8 -*-
+"""AIMD регулятор скорости для избежания банов# -*- coding: utf-8 -*-
+"""
     
     def __init__(self):
         self.delay_ms = 50  # начальная задержка (уменьшена для скорости)
@@ -33,27 +38,35 @@ class AIMDController:
         self.error_count = 0
         
     def on_success(self):
-        """При успехе уменьшаем задержку"""
+        # -*- coding: utf-8 -*-
+"""При успехе уменьшаем задержку# -*- coding: utf-8 -*-
+"""
         self.success_count += 1
         if self.success_count >= 10:
             self.delay_ms = max(self.min_delay, self.delay_ms - 10)
             self.success_count = 0
             
     def on_error(self):
-        """При ошибке увеличиваем задержку"""
+        # -*- coding: utf-8 -*-
+"""При ошибке увеличиваем задержку# -*- coding: utf-8 -*-
+"""
         self.error_count += 1
         self.delay_ms = min(self.max_delay, self.delay_ms * 1.5)
         
     def get_delay(self):
-        """Получить текущую задержку в секундах"""
+        # -*- coding: utf-8 -*-
+"""Получить текущую задержку в секундах# -*- coding: utf-8 -*-
+"""
         return self.delay_ms / 1000.0
 
 
 class TurboWordstatParser:
-    """
+    # -*- coding: utf-8 -*-
+"""
     Турбо парсер Wordstat - 195.9 фраз/мин
     Использует технологии из наших лучших парсеров
-    """
+    # -*- coding: utf-8 -*-
+"""
     
     def __init__(self, account: Optional[Account] = None, headless: bool = False, visual_mode: bool = True):
         self.account = account
@@ -70,6 +83,9 @@ class TurboWordstatParser:
         self.db_path = Path("C:/AI/yandex/keyset/data/keyset.db")
         self.auth_handler = AutoAuthHandler()  # Обработчик авторизации
         
+        # Визуальный менеджер будет использоваться для запуска браузера
+        self.visual_manager = VisualBrowserManager(num_browsers=self.num_browsers)
+        
         # Загружаем данные авторизации из accounts.json если нет в аккаунте
         if self.account:
             self._load_auth_data()
@@ -80,7 +96,9 @@ class TurboWordstatParser:
         self.start_time = None
     
     def _load_auth_data(self):
-        """Загружаем данные авторизации из accounts.json"""
+        # -*- coding: utf-8 -*-
+"""Загружаем данные авторизации из accounts.json# -*- coding: utf-8 -*-
+"""
         try:
             accounts_json_path = Path("C:/AI/yandex/keyset/configs/accounts.json")
             if not accounts_json_path.exists():
@@ -108,109 +126,33 @@ class TurboWordstatParser:
             print(f"[AUTH] Ошибка загрузки accounts.json: {e}")
         
     async def init_browser(self):
-        """Инициализация браузера - ПОДКЛЮЧЕНИЕ через CDP как в инструкциях"""
-        self.playwright = await async_playwright().start()
+        # -*- coding: utf-8 -*-
+"""Инициализация браузера - ИСПОЛЬЗУЕМ VisualBrowserManager# -*- coding: utf-8 -*-
+"""
+        # Этот метод больше не используется, так как запуск браузера происходит в parse_batch_visual
+        # или должен быть выполнен до вызова parse_batch_cdp (если он будет сохранен)
+        pass
         
-        # КРИТИЧНО из инструкций: СНАЧАЛА нужно запустить Chrome с CDP!
-        print("[TURBO] Пытаюсь подключиться к Chrome через CDP на порту 9222...")
-        print("[TURBO] Если не работает, запустите START_CHROME_CDP.bat!")
-        
-        # Пробуем подключиться к существующему Chrome через CDP
-        try:
-            self.browser = await self.playwright.chromium.connect_over_cdp("http://127.0.0.1:9222")
-            self.context = self.browser.contexts[0]
-            print("[TURBO] Успешно подключен к Chrome через CDP!")
-            
-            # Проверяем что есть открытые вкладки
-            if not self.context.pages:
-                print("[TURBO] Нет открытых вкладок, создаю новую...")
-                page = await self.context.new_page()
-                await page.goto("https://wordstat.yandex.ru", wait_until="domcontentloaded")
-            else:
-                print(f"[TURBO] Найдено {len(self.context.pages)} открытых вкладок")
-        except Exception as e:
-            print(f"\n[ERROR] Не удалось подключиться к Chrome через CDP!")
-            print(f"[ERROR] Ошибка: {e}")
-            print("\nПожалуйста:")
-            print("1. Запустите START_CHROME_CDP.bat")
-            print("2. Убедитесь что Chrome открылся")
-            print("3. Попробуйте снова\n")
-            
-            # Проверяем, может Chrome не запущен?
-            import subprocess
-            try:
-                # Пытаемся автоматически запустить Chrome
-                print("[TURBO] Пытаюсь запустить Chrome с CDP...")
-                chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-                profile_path = r"C:\AI\yandex\.profiles\wordstat_main"
-                
-                subprocess.Popen([
-                    chrome_path,
-                    f"--remote-debugging-port=9222",
-                    f"--user-data-dir={profile_path}",
-                    "https://wordstat.yandex.ru"
-                ])
-                
-                # Ждем запуска Chrome
-                await asyncio.sleep(3)
-                
-                # Повторная попытка подключения
-                self.browser = await self.playwright.chromium.connect_over_cdp("http://127.0.0.1:9222")
-                self.context = self.browser.contexts[0]
-                print("[TURBO] Chrome запущен и подключен!")
-            except Exception as e2:
-                print(f"[ERROR] Не удалось запустить Chrome автоматически: {e2}")
-                raise Exception("Не удалось подключиться к Chrome. Запустите START_CHROME_CDP.bat")
-
-            
-            # При CDP подключении профиль уже используется запущенным Chrome
-    
     async def setup_tabs(self):
-        """Настройка всех вкладок СРАЗУ (из финального парсера)"""
-        print(f"[TURBO] Подготовка {self.num_tabs} вкладок...")
+        # -*- coding: utf-8 -*-
+"""Настройка всех вкладок СРАЗУ (из финального парсера)# -*- coding: utf-8 -*-
+"""
+        # Этот метод больше не используется, так как VisualBrowserManager управляет вкладками
+        pass
         
-        existing_pages = self.context.pages
-        
-        # КРИТИЧНО: Создаем ВСЕ недостающие вкладки СРАЗУ
-        print(f"[TURBO] Существующих вкладок: {len(existing_pages)}, нужно: {self.num_tabs}")
-        
-        for i in range(len(existing_pages), self.num_tabs):
-            print(f"[TURBO] Создаю вкладку {i+1}...")
-            page = await self.context.new_page()
-            existing_pages.append(page)
-        
-        self.pages = existing_pages[:self.num_tabs]
-        self.page_mapping = {}
-        
-        print(f"[TURBO] Загружаем Wordstat на {len(self.pages)} вкладках...")
-        
-        # Загружаем Wordstat на ВСЕХ вкладках
-        for i, page in enumerate(self.pages):
-            self.page_mapping[i] = page
+    async def close_browser(self):
+        # -*- coding: utf-8 -*-
+"""Закрытие браузера# -*- coding: utf-8 -*-
+"""
+        if self.visual_manager:
+            await self.visual_manager.close_all()
             
-            if "wordstat.yandex.ru" not in page.url:
-                print(f"[TURBO] Tab {i}: Открываю Wordstat...")
-                try:
-                    await page.goto("https://wordstat.yandex.ru", timeout=15000)
-                    print(f"[TURBO] Tab {i}: Wordstat открыт")
-                except Exception as e:
-                    print(f"[TURBO] Tab {i}: Ошибка: {str(e)[:50]}")
-                
-                # Пауза между загрузками чтобы не триггерить защиту
-                await asyncio.sleep(2)
-            else:
-                print(f"[TURBO] Tab {i}: Wordstat уже открыт")
-        
-        print(f"[TURBO] ВСЕ {len(self.pages)} вкладок готовы к работе!")
-        
-        # Настраиваем перехват ответов на всех вкладках
-        for i, page in enumerate(self.pages):
-            page.on("response", lambda response, tab_id=i: asyncio.create_task(
-                self.handle_response(response, tab_id)
-            ))
+        print("[TURBO] Все браузеры закрыты.")
     
     async def wait_wordstat_ready(self, page):
-        """Ожидание полной загрузки Wordstat (из файла 46)"""
+        # -*- coding: utf-8 -*-
+"""Ожидание полной загрузки Wordstat (из файла 46)# -*- coding: utf-8 -*-
+"""
         try:
             # 1) Базовая загрузка документа
             await page.wait_for_load_state('domcontentloaded', timeout=30000)
@@ -264,22 +206,79 @@ class TurboWordstatParser:
             print(f"[WAIT] Ошибка ожидания загрузки Wordstat: {e}")
     
     async def handle_response(self, response, tab_id):
-        """Перехват XHR ответов от Wordstat API"""
+        # -*- coding: utf-8 -*-
+"""Перехват XHR ответов от Wordstat API# -*- coding: utf-8 -*-
+"""
         try:
             if "/wordstat/api" in response.url and response.status == 200:
                 content_type = response.headers.get("content-type", "")
                 if "application/json" in content_type:
-                    data = await response.json()
+                    # 1. Читаем ответ как байты для явного декодирования
+                    try:
+                        raw_body = await response.body()
+                    except Exception as e:
+                        print(f"[Tab {tab_id}] ERROR reading response body: {e}")
+                        return
+                    
+                    # 2. Явное декодирование CP1251 -> UTF-8
+                    try:
+                        text = raw_body.decode("cp1251")
+                        print(f"[Tab {tab_id}] INFO: Decoded body from cp1251")
+                    except UnicodeDecodeError:
+                        text = raw_body.decode("utf-8", "ignore")
+                    
+                    # 3. Парсинг JSON
+                    try:
+                        data = json.loads(text)
+                    except json.JSONDecodeError as e:
+                        print(f"[Tab {tab_id}] CRITICAL: Cannot parse JSON: {e}")
+                        traceback.print_exc()
+                        return
+                    
+                    # 4. Нормализация структуры (для совместимости со старым UI)
+                    if 'data' in data and 'table' in data['data']:
+                        tbl = data['data']['table']
+                        tdata = tbl.get("tableData") or {}
+                        
+                        popular = tdata.get("popular") or []
+                        assoc   = tdata.get("associations") or []
+                        
+                        # «старое» поле, которое ждёт фронт
+                        # Если популяр есть, используем его, иначе ищем старое items
+                        items = popular or tbl.get("items") or []
+                        related = assoc
+                        
+                        # Обновляем структуру данных для дальнейшей обработки
+                        tbl['items'] = items
+                        tbl['related'] = related
+                        
+                        # ВАЖНО: totalValue теперь в data.totalValue, а не в data.data.totalValue
+                        if 'totalValue' in data:
+                             data['data']['totalValue'] = data['totalValue']
+                        
+                        # Если totalValue отсутствует, ищем его в items
+                        if 'totalValue' not in data['data'] and items:
+                            data['data']['totalValue'] = items[0].get('frequency', 0)
+                        
+                        # Устанавливаем частотность
+                        frequency = data['data'].get('totalValue')
                     
                     # Извлекаем данные о частотности
-                    if 'data' in data and 'totalValue' in data['data']:
-                        frequency = data['data']['totalValue']
+
                         
                         # Получаем запрос из request body
                         request_body = response.request.post_data
                         if request_body:
-                            request_data = json.loads(request_body)
-                            query = request_data.get("searchValue", "").strip()
+                            # Важно: request_body может быть в виде url-encoded строки,
+                            # но для Yandex Wordstat это обычно JSON
+                            try:
+                                request_data = json.loads(request_body)
+                                query = request_data.get("searchValue", "").strip()
+                            except json.JSONDecodeError:
+                                # Если не JSON, возможно это url-encoded строка
+                                # В данном случае, мы ожидаем JSON, поэтому логируем ошибку
+                                print(f"[Tab {tab_id}] WARNING: Request body is not JSON for {response.url}")
+                                query = None
                             
                             if query:
                                 self.results[query] = frequency
@@ -290,13 +289,17 @@ class TurboWordstatParser:
             pass  # Игнорируем ошибки парсинга ответов
     
     async def process_tab_worker(self, page, phrases, tab_id):
-        """Воркер для обработки фраз на одной вкладке (рабочая версия из parse_5_accounts_cdp.py)"""
+        # -*- coding: utf-8 -*-
+"""Воркер для обработки фраз на одной вкладке (рабочая версия из parse_5_accounts_cdp.py)# -*- coding: utf-8 -*-
+"""
         tab_results = []
         results_lock = asyncio.Lock()
         
         # Настраиваем обработчик ответов для перехвата частотностей
         async def handle_response(response):
-            """Перехватываем ответы API и извлекаем частотности"""
+            # -*- coding: utf-8 -*-
+"""Перехватываем ответы API и извлекаем частотности# -*- coding: utf-8 -*-
+"""
             if "/wordstat/api" in response.url and response.status == 200:
                 try:
                     data = await response.json()
@@ -344,7 +347,7 @@ class TurboWordstatParser:
                 print(f"[Tab {tab_id}] Ошибка при открытии: {e}")
                 return tab_results
         
-        # Убеждаемся что поле ввода доступно перед началом
+        # Убеждаемся, что поле ввода доступно перед началом
         print(f"[Tab {tab_id}] Проверяю готовность страницы...")
         try:
             await page.wait_for_selector('input[placeholder*="слово"], input[name="text"]', timeout=10000)
@@ -380,10 +383,13 @@ class TurboWordstatParser:
                     # Очищаем и вводим фразу
                     await input_field.clear()
                     await input_field.fill(phrase)
+                    
+                    # Имитируем нажатие Enter. Нам не нужно ждать ответа,
+                    # так как мы его перехватываем через handle_response.
                     await input_field.press("Enter")
                     
                     # Ждем ответ (минимальная задержка)
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(self.aimd.get_delay())
                 else:
                     print(f"[Tab {tab_id}] Не найдено поле ввода для '{phrase}'")
                     
@@ -405,11 +411,10 @@ class TurboWordstatParser:
         return tab_results
     
     async def parse_batch_visual(self, queries: List[str], region: int = 225):
-        """Парсинг батча фраз в визуальном режиме с несколькими браузерами"""
+        # -*- coding: utf-8 -*-
+"""Парсинг батча фраз в визуальном режиме с несколькими браузерами# -*- coding: utf-8 -*-
+"""
         self.start_time = time.time()
-        
-        # Создаем визуальный менеджер
-        self.visual_manager = VisualBrowserManager(num_browsers=self.num_browsers)
         
         # Подготавливаем аккаунты для браузеров - БЕРЕМ ИЗ БАЗЫ ДАННЫХ!
         accounts = []
@@ -465,6 +470,15 @@ class TurboWordstatParser:
             print("\n[!] ВАЖНО: Залогиньтесь в каждом открытом браузере!")
             print("После логина парсинг начнется автоматически.\n")
             
+            # Получаем страницы для перехвата ответов (ВАЖНО: VisualManager должен иметь метод для этого)
+            self.pages = [b.page for b in self.visual_manager.browsers.values() if b.page]
+            
+            # Настраиваем перехват ответов на всех вкладках
+            for i, page in enumerate(self.pages):
+                page.on("response", lambda response, tab_id=i: asyncio.create_task(
+                    self.handle_response(response, tab_id)
+                ))
+            
             logged_in = await self.visual_manager.wait_for_all_logins(timeout=300)
             
             if not logged_in:
@@ -477,7 +491,9 @@ class TurboWordstatParser:
             
             # Парсим фразы
             print(f"\n[VISUAL] Начинаем парсинг {len(queries)} фраз...")
-            results_dict = await self.visual_manager.parse_batch_parallel(queries)
+            
+            # Теперь используем страницы для перехвата ответов
+            results_dict = await self.parse_batch_parallel(queries)
             
             # Преобразуем результаты
             results = []
@@ -513,7 +529,9 @@ class TurboWordstatParser:
                 await self.visual_manager.close_all()
     
     async def parse_batch(self, queries: List[str], region: int = 225):
-        """Парсинг батча фраз с мульти-табами"""
+        # -*- coding: utf-8 -*-
+"""Парсинг батча фраз с мульти-табами# -*- coding: utf-8 -*-
+"""
         # Если включен визуальный режим - используем visual manager
         if self.visual_mode and not self.headless:
             return await self.parse_batch_visual(queries, region)
@@ -570,16 +588,20 @@ class TurboWordstatParser:
         return all_results
     
     async def save_to_db(self, results: List[Dict]):
-        """Сохранение результатов в БД KeySet"""
+        # -*- coding: utf-8 -*-
+"""Сохранение результатов в БД KeySet# -*- coding: utf-8 -*-
+"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         for result in results:
-            cursor.execute("""
+            cursor.execute(# -*- coding: utf-8 -*-
+"""
                 INSERT OR REPLACE INTO freq_results 
                 (mask, region, freq_total, freq_exact, status, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (
+            # -*- coding: utf-8 -*-
+""", (
                 result['query'],
                 225,  # регион РФ
                 result['frequency'],
@@ -593,7 +615,9 @@ class TurboWordstatParser:
         print(f"[TURBO] Сохранено {len(results)} результатов в БД")
     
     async def close(self):
-        """Отключение от CDP браузера (НЕ закрываем Chrome - он остается работать)"""
+        # -*- coding: utf-8 -*-
+"""Отключение от CDP браузера (НЕ закрываем Chrome - он остается работать)# -*- coding: utf-8 -*-
+"""
         try:
             # При CDP подключении мы НЕ закрываем Chrome!
             # Просто отключаемся
@@ -610,40 +634,55 @@ class TurboWordstatParser:
 # Дополнительные модули из рекомендаций GPT
 
 class ForecastParser:
-    """Парсер прогноза бюджета через web интерфейс Директа"""
+    # -*- coding: utf-8 -*-
+"""Парсер прогноза бюджета через web интерфейс Директа# -*- coding: utf-8 -*-
+"""
     
     async def parse_forecast(self, phrases: List[str], region: int = 225):
-        """Получить прогноз бюджета для фраз"""
+        # -*- coding: utf-8 -*-
+"""Получить прогноз бюджета для фраз# -*- coding: utf-8 -*-
+"""
         # TODO: Реализовать парсинг страницы прогноза Директа
         pass
 
 
 class SuggestParser:
-    """Парсер подсказок Яндекса для расширения семантики"""
+    # -*- coding: utf-8 -*-
+"""Парсер подсказок Яндекса для расширения семантики# -*- coding: utf-8 -*-
+"""
     
     async def get_suggestions(self, seed_phrase: str) -> List[str]:
-        """Получить подсказки для фразы"""
+        # -*- coding: utf-8 -*-
+"""Получить подсказки для фразы# -*- coding: utf-8 -*-
+"""
         # TODO: Использовать API подсказок Яндекса
         pass
 
 
 class PhraseClusterer:
-    """Кластеризация фраз и генерация минус-слов"""
+    # -*- coding: utf-8 -*-
+"""Кластеризация фраз и генерация минус-слов# -*- coding: utf-8 -*-
+"""
     
     def cluster_phrases(self, phrases: List[str], threshold: float = 0.6):
-        """Кластеризация похожих фраз"""
+        # -*- coding: utf-8 -*-
+"""Кластеризация похожих фраз# -*- coding: utf-8 -*-
+"""
         # TODO: Реализовать через pymorphy2 + TF-IDF
         pass
     
     def generate_minus_words(self, clusters: Dict):
-        """Генерация кросс-минус слов между кластерами"""
+        # -*- coding: utf-8 -*-
+"""Генерация кросс-минус слов между кластерами# -*- coding: utf-8 -*-
+"""
         # TODO: Найти пересечения между кластерами
         pass
 
 
 # Главная функция для интеграции в KeySet
 async def run_turbo_parser(queries: List[str], account: Optional[Account] = None, headless: bool = False):
-    """
+    # -*- coding: utf-8 -*-
+"""
     Запуск турбо парсера из GUI KeySet
     
     Args:
@@ -653,7 +692,8 @@ async def run_turbo_parser(queries: List[str], account: Optional[Account] = None
     
     Returns:
         Список результатов с частотностями
-    """
+    # -*- coding: utf-8 -*-
+"""
     parser = TurboWordstatParser(account=account, headless=headless)
     
     try:
