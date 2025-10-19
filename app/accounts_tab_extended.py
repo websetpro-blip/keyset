@@ -1,10 +1,11 @@
+# -*- coding: utf-8 -*-
 """
-Расширенная вкладка управления аккаунтами с функцией логина
+Р Р°СЃС€РёСЂРµРЅРЅР°СЏ РІРєР»Р°РґРєР° СѓРїСЂР°РІР»РµРЅРёСЏ Р°РєРєР°СѓРЅС‚Р°РјРё СЃ С„СѓРЅРєС†РёРµР№ Р»РѕРіРёРЅР°
 
-ПРАВИЛО №1: НЕ ЛОМАТЬ ТО ЧТО РАБОТАЕТ!
-- Не удалять рабочие функции
-- Не изменять работающую логику
-- Не трогать то, что пользователь не просил менять
+РџР РђР’РР›Рћ в„–1: РќР• Р›РћРњРђРўР¬ РўРћ Р§РўРћ Р РђР‘РћРўРђР•Рў!
+- РќРµ СѓРґР°Р»СЏС‚СЊ СЂР°Р±РѕС‡РёРµ С„СѓРЅРєС†РёРё
+- РќРµ РёР·РјРµРЅСЏС‚СЊ СЂР°Р±РѕС‚Р°СЋС‰СѓСЋ Р»РѕРіРёРєСѓ
+- РќРµ С‚СЂРѕРіР°С‚СЊ С‚Рѕ, С‡С‚Рѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РїСЂРѕСЃРёР» РјРµРЅСЏС‚СЊ
 """
 
 import asyncio
@@ -12,7 +13,7 @@ import threading
 import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 
 from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtWidgets import (
@@ -29,17 +30,18 @@ from ..services.accounts import test_proxy, get_cookies_status, autologin_accoun
 from ..services.captcha import CaptchaService
 from ..services.proxy_manager import ProxyManager
 from ..services.browser_factory import start_for_account
+from ..utils.proxy import parse_proxy
 from ..workers.visual_browser_manager import VisualBrowserManager, BrowserStatus
-# Старый worker больше не используется, теперь CDP подход
+# РЎС‚Р°СЂС‹Р№ worker Р±РѕР»СЊС€Рµ РЅРµ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ, С‚РµРїРµСЂСЊ CDP РїРѕРґС…РѕРґ
 
 PROFILE_SELECT_COLUMN = 5
 PROFILE_OPTIONS_ROLE = Qt.UserRole + 101
 PROXY_SELECT_COLUMN = 6
-PROXY_NONE_LABEL = "— Без прокси —"
+PROXY_NONE_LABEL = "вЂ” Р‘РµР· РїСЂРѕРєСЃРё вЂ”"
 
 
 class ProfileComboDelegate(QStyledItemDelegate):
-    """Делегат для редактирования профилей аккаунтов (ComboBox)."""
+    """Р”РµР»РµРіР°С‚ РґР»СЏ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ РїСЂРѕС„РёР»РµР№ Р°РєРєР°СѓРЅС‚РѕРІ (ComboBox)."""
 
     def createEditor(self, parent, option, index):
         editor = QComboBox(parent)
@@ -77,9 +79,9 @@ class ProfileComboDelegate(QStyledItemDelegate):
 
 
 class AutoLoginThread(QThread):
-    """Поток для автоматической авторизации аккаунта"""
-    status_signal = Signal(str)  # Статус операции
-    progress_signal = Signal(int)  # Прогресс 0-100
+    """РџРѕС‚РѕРє РґР»СЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРѕР№ Р°РІС‚РѕСЂРёР·Р°С†РёРё Р°РєРєР°СѓРЅС‚Р°"""
+    status_signal = Signal(str)  # РЎС‚Р°С‚СѓСЃ РѕРїРµСЂР°С†РёРё
+    progress_signal = Signal(int)  # РџСЂРѕРіСЂРµСЃСЃ 0-100
     secret_question_signal = Signal(str, str)  # account_name, question_text
     finished_signal = Signal(bool, str)  # success, message
     
@@ -89,11 +91,11 @@ class AutoLoginThread(QThread):
         self.secret_answer = None
         
     def set_secret_answer(self, answer):
-        """Установить ответ на секретный вопрос"""
+        """РЈСЃС‚Р°РЅРѕРІРёС‚СЊ РѕС‚РІРµС‚ РЅР° СЃРµРєСЂРµС‚РЅС‹Р№ РІРѕРїСЂРѕСЃ"""
         self.secret_answer = answer
         
     def run(self):
-        """Запуск умного автологина на основе решения GPT"""
+        """Р—Р°РїСѓСЃРє СѓРјРЅРѕРіРѕ Р°РІС‚РѕР»РѕРіРёРЅР° РЅР° РѕСЃРЅРѕРІРµ СЂРµС€РµРЅРёСЏ GPT"""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -116,25 +118,25 @@ class AutoLoginThread(QThread):
 
         profile_path = self.account.profile_path
 
-        # ⚠️ ПРОВЕРКА: Профиль ДОЛжеН быть из БД!
+        # вљ пёЏ РџР РћР’Р•Р РљРђ: РџСЂРѕС„РёР»СЊ Р”РћР›Р¶РµРќ Р±С‹С‚СЊ РёР· Р‘Р”!
         if not profile_path:
-            self.status_signal.emit(f"[ERROR] У аккаунта {self.account.name} НЕТ profile_path в БД!")
-            self.finished_signal.emit(False, "Профиль не указан в БД")
+            self.status_signal.emit(f"[ERROR] РЈ Р°РєРєР°СѓРЅС‚Р° {self.account.name} РќР•Рў profile_path РІ Р‘Р”!")
+            self.finished_signal.emit(False, "РџСЂРѕС„РёР»СЊ РЅРµ СѓРєР°Р·Р°РЅ РІ Р‘Р”")
             return
 
-        self.status_signal.emit(f"[OK] Профиль РёР· Р'Р]: {profile_path}")
+        self.status_signal.emit(f"[OK] РџСЂРѕС„РёР»СЊ Р С‘Р В· Р 'Р ]: {profile_path}")
 
         base_dir = Path("C:/AI/yandex")
         profile_path_obj = Path(profile_path)
         if not profile_path_obj.is_absolute():
             profile_path_obj = base_dir / profile_path_obj
         profile_path = str(profile_path_obj).replace("\\", "/")
-        self.status_signal.emit(f"[INFO] Используем профиль: {profile_path}")
+        self.status_signal.emit(f"[INFO] РСЃРїРѕР»СЊР·СѓРµРј РїСЂРѕС„РёР»СЊ: {profile_path}")
 
         accounts_file = Path("C:/AI/yandex/configs/accounts.json")
         if not accounts_file.exists():
-            self.status_signal.emit(f"[ERROR] Файл accounts.json не найден!")
-            self.finished_signal.emit(False, "Файл accounts.json не найден")
+            self.status_signal.emit(f"[ERROR] Р¤Р°Р№Р» accounts.json РЅРµ РЅР°Р№РґРµРЅ!")
+            self.finished_signal.emit(False, "Р¤Р°Р№Р» accounts.json РЅРµ РЅР°Р№РґРµРЅ")
             return
 
         with open(accounts_file, 'r', encoding='utf-8') as f:
@@ -146,19 +148,19 @@ class AutoLoginThread(QThread):
                     break
 
         if not account_info:
-            self.status_signal.emit(f"[ERROR] Аккаунт {self.account.name} не найден в accounts.json!")
-            self.finished_signal.emit(False, f"Аккаунт не найден в accounts.json")
+            self.status_signal.emit(f"[ERROR] РђРєРєР°СѓРЅС‚ {self.account.name} РЅРµ РЅР°Р№РґРµРЅ РІ accounts.json!")
+            self.finished_signal.emit(False, f"РђРєРєР°СѓРЅС‚ РЅРµ РЅР°Р№РґРµРЅ РІ accounts.json")
             return
 
-        self.status_signal.emit(f"[CDP] Запуск автологина для {self.account.name}...")
+        self.status_signal.emit(f"[CDP] Р—Р°РїСѓСЃРє Р°РІС‚РѕР»РѕРіРёРЅР° РґР»СЏ {self.account.name}...")
 
         secret_answer = self.secret_answer
         if not secret_answer and "secret" in account_info and account_info["secret"]:
             secret_answer = account_info["secret"]
-            self.status_signal.emit(f"[CDP] Найден сохраненный ответ на секретный вопрос")
+            self.status_signal.emit(f"[CDP] РќР°Р№РґРµРЅ СЃРѕС…СЂР°РЅРµРЅРЅС‹Р№ РѕС‚РІРµС‚ РЅР° СЃРµРєСЂРµС‚РЅС‹Р№ РІРѕРїСЂРѕСЃ")
 
         port = 9222 + (hash(self.account.name) % 100)
-        self.status_signal.emit(f"[CDP] Используется порт {port} для {self.account.name}")
+        self.status_signal.emit(f"[CDP] РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РїРѕСЂС‚ {port} РґР»СЏ {self.account.name}")
 
         smart_login = YandexSmartLogin()
         smart_login.status_update.connect(self.status_signal.emit)
@@ -170,9 +172,9 @@ class AutoLoginThread(QThread):
 
         proxy_to_use = account_info.get("proxy", None)
         if proxy_to_use:
-            self.status_signal.emit(f"[INFO] Используется прокси: {proxy_to_use.split('@')[0]}@***")
+            self.status_signal.emit(f"[INFO] РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РїСЂРѕРєСЃРё: {proxy_to_use.split('@')[0]}@***")
 
-        self.status_signal.emit(f"[SMART] Запускаю автологин...")
+        self.status_signal.emit(f"[SMART] Р—Р°РїСѓСЃРєР°СЋ Р°РІС‚РѕР»РѕРіРёРЅ...")
         success = await smart_login.login(
             account_name=self.account.name,
             profile_path=profile_path,
@@ -180,16 +182,16 @@ class AutoLoginThread(QThread):
         )
 
         if success:
-            self.status_signal.emit(f"[OK] Автологин успешен для {self.account.name}!")
-            self.finished_signal.emit(True, "Авторизация успешна")
+            self.status_signal.emit(f"[OK] РђРІС‚РѕР»РѕРіРёРЅ СѓСЃРїРµС€РµРЅ РґР»СЏ {self.account.name}!")
+            self.finished_signal.emit(True, "РђРІС‚РѕСЂРёР·Р°С†РёСЏ СѓСЃРїРµС€РЅР°")
         else:
-            self.status_signal.emit(f"[ERROR] Автологин не удался для {self.account.name}")
-            self.finished_signal.emit(False, "Ошибка авторизации")
+            self.status_signal.emit(f"[ERROR] РђРІС‚РѕР»РѕРіРёРЅ РЅРµ СѓРґР°Р»СЃСЏ РґР»СЏ {self.account.name}")
+            self.finished_signal.emit(False, "РћС€РёР±РєР° Р°РІС‚РѕСЂРёР·Р°С†РёРё")
 
 
 class LoginWorkerThread(QThread):
-    """Поток для логина в браузеры"""
-    progress_signal = Signal(str)  # Сообщение о прогрессе
+    """РџРѕС‚РѕРє РґР»СЏ Р»РѕРіРёРЅР° РІ Р±СЂР°СѓР·РµСЂС‹"""
+    progress_signal = Signal(str)  # РЎРѕРѕР±С‰РµРЅРёРµ Рѕ РїСЂРѕРіСЂРµСЃСЃРµ
     account_logged_signal = Signal(int, bool, str)  # account_id, success, message
     finished_signal = Signal(bool, str)  # success, message
     
@@ -197,11 +199,42 @@ class LoginWorkerThread(QThread):
         super().__init__(parent)
         self.accounts = accounts_to_login
         self.manager = None
-        self.check_only = check_only  # Только проверка без открытия браузеров
-        self.visual_mode = visual_mode  # Визуальный режим - всегда открывать браузеры
-        
+        self.check_only = check_only  # РўРѕР»СЊРєРѕ РїСЂРѕРІРµСЂРєР° Р±РµР· РѕС‚РєСЂС‹С‚РёСЏ Р±СЂР°СѓР·РµСЂРѕРІ
+        self.visual_mode = visual_mode  # Р’РёР·СѓР°Р»СЊРЅС‹Р№ СЂРµР¶РёРј - РІСЃРµРіРґР° РѕС‚РєСЂС‹РІР°С‚СЊ Р±СЂР°СѓР·РµСЂС‹
+        self.proxy_manager = ProxyManager.instance()
+
+    def _build_proxy_payload(self, account) -> Tuple[Optional[Dict[str, str]], Optional[str], Optional[str]]:
+        """Готовит прокси-конфиг для аккаунта: (playwright_config, proxy_uri, proxy_id)."""
+        proxy_id = getattr(account, "proxy_id", None)
+        if proxy_id:
+            proxy_obj = self.proxy_manager.get(proxy_id)
+            if proxy_obj:
+                cfg = proxy_obj.playwright_config()
+                server = cfg.get("server")
+                if server and "://" not in server:
+                    cfg["server"] = f"http://{server}"
+                return cfg, proxy_obj.uri(include_credentials=True), proxy_obj.id
+
+        raw_proxy = (getattr(account, "proxy", "") or "").strip()
+        if raw_proxy:
+            parsed = parse_proxy(raw_proxy)
+            if parsed:
+                server = parsed.get("server")
+                if server and "://" not in server:
+                    parsed["server"] = f"http://{server}"
+                scheme, host = parsed["server"].split("://", 1)
+                username = parsed.get("username")
+                password = parsed.get("password") or ""
+                if username:
+                    uri = f"{scheme}://{username}:{password}@{host}"
+                else:
+                    uri = f"{scheme}://{host}"
+                return parsed, uri, None
+
+        return None, None, None
+
     def run(self):
-        """Запуск логина в отдельном потоке"""
+        """Р—Р°РїСѓСЃРє Р»РѕРіРёРЅР° РІ РѕС‚РґРµР»СЊРЅРѕРј РїРѕС‚РѕРєРµ"""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -218,37 +251,39 @@ class LoginWorkerThread(QThread):
             loop.close()
     
     async def _run_async(self):
-        """Логин в аккаунты"""
+        """Р›РѕРіРёРЅ РІ Р°РєРєР°СѓРЅС‚С‹"""
         from ..workers.auth_checker import AuthChecker
         
-        # Отладка - показываем сколько аккаунтов получили
+        # РћС‚Р»Р°РґРєР° - РїРѕРєР°Р·С‹РІР°РµРј СЃРєРѕР»СЊРєРѕ Р°РєРєР°СѓРЅС‚РѕРІ РїРѕР»СѓС‡РёР»Рё
         self.progress_signal.emit(f"Received {len(self.accounts)} accounts for processing")
         self.progress_signal.emit(f"Accounts: {[acc.name if hasattr(acc, 'name') else str(acc) for acc in self.accounts]}")
         
         self.progress_signal.emit(f"Checking authorization for {len(self.accounts)} accounts...")
         
-        # Сначала проверяем авторизацию через Wordstat
+        # РЎРЅР°С‡Р°Р»Р° РїСЂРѕРІРµСЂСЏРµРј Р°РІС‚РѕСЂРёР·Р°С†РёСЋ С‡РµСЂРµР· Wordstat
         auth_checker = AuthChecker()
         accounts_to_check = []
         
         for acc in self.accounts:
-            # Используем абсолютные пути для Windows
+            # РСЃРїРѕР»СЊР·СѓРµРј Р°Р±СЃРѕР»СЋС‚РЅС‹Рµ РїСѓС‚Рё РґР»СЏ Windows
             if acc.profile_path:
                 profile = str(Path(acc.profile_path).absolute()).replace("\\", "/")
             else:
                 profile = str(Path(f"C:/AI/yandex/.profiles/{acc.name}").absolute()).replace("\\", "/")
+            _, proxy_uri, proxy_id = self._build_proxy_payload(acc)
             accounts_to_check.append({
                 "name": acc.name,
                 "profile_path": profile,
-                "proxy": acc.proxy,
+                "proxy": proxy_uri or acc.proxy,
+                "proxy_id": proxy_id,
                 "account_id": acc.id
             })
         
-        # Проверяем авторизацию
+        # РџСЂРѕРІРµСЂСЏРµРј Р°РІС‚РѕСЂРёР·Р°С†РёСЋ
         self.progress_signal.emit("Testing authorization via Wordstat...")
         auth_results = await auth_checker.check_multiple_accounts(accounts_to_check)
         
-        # Фильтруем кто нуждается в логине
+        # Р¤РёР»СЊС‚СЂСѓРµРј РєС‚Рѕ РЅСѓР¶РґР°РµС‚СЃСЏ РІ Р»РѕРіРёРЅРµ
         need_login = []
         already_authorized = []
         
@@ -259,7 +294,7 @@ class LoginWorkerThread(QThread):
             if result.get("is_authorized"):
                 already_authorized.append(acc_name)
                 self.progress_signal.emit(f"[OK] {acc_name}: Already authorized")
-                # Обновляем статус в БД
+                # РћР±РЅРѕРІР»СЏРµРј СЃС‚Р°С‚СѓСЃ РІ Р‘Р”
                 self.account_logged_signal.emit(acc_data["account_id"], True, "Authorized")
             else:
                 need_login.append(acc_data)
@@ -270,39 +305,39 @@ class LoginWorkerThread(QThread):
         
         if not need_login:
             self.progress_signal.emit("All accounts are authorized!")
-            # В визуальном режиме открываем браузеры даже если все авторизованы
+            # Р’ РІРёР·СѓР°Р»СЊРЅРѕРј СЂРµР¶РёРјРµ РѕС‚РєСЂС‹РІР°РµРј Р±СЂР°СѓР·РµСЂС‹ РґР°Р¶Рµ РµСЃР»Рё РІСЃРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅС‹
             if self.visual_mode:
                 self.progress_signal.emit("Opening browsers for visual parsing...")
-                need_login = accounts_to_check  # Открываем браузеры для всех аккаунтов
+                need_login = accounts_to_check  # РћС‚РєСЂС‹РІР°РµРј Р±СЂР°СѓР·РµСЂС‹ РґР»СЏ РІСЃРµС… Р°РєРєР°СѓРЅС‚РѕРІ
             elif not self.check_only:
                 self.progress_signal.emit("Opening browsers for visual parsing...")
-                need_login = accounts_to_check  # Открываем браузеры для всех аккаунтов
+                need_login = accounts_to_check  # РћС‚РєСЂС‹РІР°РµРј Р±СЂР°СѓР·РµСЂС‹ РґР»СЏ РІСЃРµС… Р°РєРєР°СѓРЅС‚РѕРІ
             else:
                 self.finished_signal.emit(True, f"All {len(self.accounts)} accounts are authorized")
                 return
         
-        # Если есть кто требует логина или нужны браузеры для парсинга
+        # Р•СЃР»Рё РµСЃС‚СЊ РєС‚Рѕ С‚СЂРµР±СѓРµС‚ Р»РѕРіРёРЅР° РёР»Рё РЅСѓР¶РЅС‹ Р±СЂР°СѓР·РµСЂС‹ РґР»СЏ РїР°СЂСЃРёРЅРіР°
         if not self.check_only:
             self.progress_signal.emit(f"Opening {len(need_login)} browsers...")
             
-            # Создаем менеджер браузеров
+            # РЎРѕР·РґР°РµРј РјРµРЅРµРґР¶РµСЂ Р±СЂР°СѓР·РµСЂРѕРІ
             self.manager = VisualBrowserManager(num_browsers=len(need_login))
             
             try:
-                # Запускаем браузеры только для тех кто не авторизован
+                # Р—Р°РїСѓСЃРєР°РµРј Р±СЂР°СѓР·РµСЂС‹ С‚РѕР»СЊРєРѕ РґР»СЏ С‚РµС… РєС‚Рѕ РЅРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ
                 await self.manager.start_all_browsers(need_login)
                 
                 self.progress_signal.emit("Browsers opened. Waiting for login...")
                 self.progress_signal.emit("Please login in each opened browser!")
                 
-                # Ждем логина
+                # Р–РґРµРј Р»РѕРіРёРЅР°
                 logged_in = await self.manager.wait_for_all_logins(timeout=300)
                 
                 if logged_in:
-                    # Обновляем статус аккаунтов
+                    # РћР±РЅРѕРІР»СЏРµРј СЃС‚Р°С‚СѓСЃ Р°РєРєР°СѓРЅС‚РѕРІ
                     for browser_id, browser in self.manager.browsers.items():
                         if browser.status == BrowserStatus.LOGGED_IN:
-                            # Находим account_id из need_login
+                            # РќР°С…РѕРґРёРј account_id РёР· need_login
                             if browser_id < len(need_login):
                                 acc_data = need_login[browser_id]
                                 self.account_logged_signal.emit(
@@ -325,7 +360,7 @@ class LoginWorkerThread(QThread):
 
 
 class AccountsTabExtended(QWidget):
-    """Расширенная вкладка аккаунтов с функцией логина"""
+    """Р Р°СЃС€РёСЂРµРЅРЅР°СЏ РІРєР»Р°РґРєР° Р°РєРєР°СѓРЅС‚РѕРІ СЃ С„СѓРЅРєС†РёРµР№ Р»РѕРіРёРЅР°"""
     accounts_changed = Signal()
     
     def __init__(self):
@@ -340,35 +375,35 @@ class AccountsTabExtended(QWidget):
         self.setup_ui()
         
     def setup_ui(self):
-        """Создание интерфейса"""
+        """РЎРѕР·РґР°РЅРёРµ РёРЅС‚РµСЂС„РµР№СЃР°"""
         layout = QVBoxLayout(self)
         
-        # Верхняя панель с кнопками управления
+        # Р’РµСЂС…РЅСЏСЏ РїР°РЅРµР»СЊ СЃ РєРЅРѕРїРєР°РјРё СѓРїСЂР°РІР»РµРЅРёСЏ
         buttons_layout = QHBoxLayout()
         
-        # Стандартные кнопки
-        self.add_btn = QPushButton("➕ Добавить")
+        # РЎС‚Р°РЅРґР°СЂС‚РЅС‹Рµ РєРЅРѕРїРєРё
+        self.add_btn = QPushButton("вћ• Р”РѕР±Р°РІРёС‚СЊ")
         self.add_btn.clicked.connect(self.add_account)
         buttons_layout.addWidget(self.add_btn)
         
-        self.edit_btn = QPushButton("✏️ Изменить")
+        self.edit_btn = QPushButton("вњЏпёЏ РР·РјРµРЅРёС‚СЊ")
         self.edit_btn.clicked.connect(self.edit_account)
         self.edit_btn.setEnabled(False)
         buttons_layout.addWidget(self.edit_btn)
         
-        self.delete_btn = QPushButton("🗑️ Удалить")
+        self.delete_btn = QPushButton("рџ—‘пёЏ РЈРґР°Р»РёС‚СЊ")
         self.delete_btn.clicked.connect(self.delete_account)
         self.delete_btn.setEnabled(False)
         buttons_layout.addWidget(self.delete_btn)
         
-        self.import_btn = QPushButton("📥 Импорт")
+        self.import_btn = QPushButton("рџ“Ґ РРјРїРѕСЂС‚")
         self.import_btn.clicked.connect(self.import_accounts)
         buttons_layout.addWidget(self.import_btn)
         
         buttons_layout.addStretch()
         
-        # Новые кнопки для логина
-        self.login_btn = QPushButton("🔐 Войти")
+        # РќРѕРІС‹Рµ РєРЅРѕРїРєРё РґР»СЏ Р»РѕРіРёРЅР°
+        self.login_btn = QPushButton("рџ”ђ Р’РѕР№С‚Рё")
         self.login_btn.clicked.connect(self.login_selected)
         self.login_btn.setEnabled(False)
         self.login_btn.setStyleSheet("""
@@ -387,8 +422,8 @@ class AccountsTabExtended(QWidget):
         """)
         buttons_layout.addWidget(self.login_btn)
         
-        # Кнопка автоматического логина
-        self.auto_login_btn = QPushButton("Автологин")
+        # РљРЅРѕРїРєР° Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРѕРіРѕ Р»РѕРіРёРЅР°
+        self.auto_login_btn = QPushButton("РђРІС‚РѕР»РѕРіРёРЅ")
         self.auto_login_btn.clicked.connect(self.auto_login_selected)
         self.auto_login_btn.setEnabled(False)
         self.auto_login_btn.setStyleSheet("""
@@ -405,10 +440,10 @@ class AccountsTabExtended(QWidget):
                 background-color: #cccccc;
             }
         """)
-        self.auto_login_btn.setToolTip("Автоматическая авторизация с вводом логина и пароля")
+        self.auto_login_btn.setToolTip("РђРІС‚РѕРјР°С‚РёС‡РµСЃРєР°СЏ Р°РІС‚РѕСЂРёР·Р°С†РёСЏ СЃ РІРІРѕРґРѕРј Р»РѕРіРёРЅР° Рё РїР°СЂРѕР»СЏ")
         buttons_layout.addWidget(self.auto_login_btn)
         
-        self.login_all_btn = QPushButton("🔐 Войти во все")
+        self.login_all_btn = QPushButton("рџ”ђ Р’РѕР№С‚Рё РІРѕ РІСЃРµ")
         self.login_all_btn.clicked.connect(self.launch_browsers_cdp)
         self.login_all_btn.setStyleSheet("""
             QPushButton {
@@ -423,15 +458,15 @@ class AccountsTabExtended(QWidget):
         """)
         buttons_layout.addWidget(self.login_all_btn)
         
-        self.refresh_btn = QPushButton("🔄 Обновить")
+        self.refresh_btn = QPushButton("рџ”„ РћР±РЅРѕРІРёС‚СЊ")
         self.refresh_btn.clicked.connect(self.refresh)
         buttons_layout.addWidget(self.refresh_btn)
         
-        # Кнопка Proxy Manager
-        self.test_proxy_btn = QPushButton("🔌 Прокси-менеджер")
+        # РљРЅРѕРїРєР° Proxy Manager
+        self.test_proxy_btn = QPushButton("рџ”Њ РџСЂРѕРєСЃРё-РјРµРЅРµРґР¶РµСЂ")
         self.test_proxy_btn.clicked.connect(self.open_proxy_manager)
-        self.test_proxy_btn.setEnabled(True)  # Всегда доступна
-        self.test_proxy_btn.setToolTip("Открыть Proxy Manager для массовой проверки")
+        self.test_proxy_btn.setEnabled(True)  # Р’СЃРµРіРґР° РґРѕСЃС‚СѓРїРЅР°
+        self.test_proxy_btn.setToolTip("РћС‚РєСЂС‹С‚СЊ Proxy Manager РґР»СЏ РјР°СЃСЃРѕРІРѕР№ РїСЂРѕРІРµСЂРєРё")
         self.test_proxy_btn.setStyleSheet("""
             QPushButton {
                 background-color: #9C27B0;
@@ -448,10 +483,10 @@ class AccountsTabExtended(QWidget):
         """)
         buttons_layout.addWidget(self.test_proxy_btn)
         
-        # Кнопка проверки баланса капчи
-        self.check_captcha_btn = QPushButton("🎫 Баланс капчи")
+        # РљРЅРѕРїРєР° РїСЂРѕРІРµСЂРєРё Р±Р°Р»Р°РЅСЃР° РєР°РїС‡Рё
+        self.check_captcha_btn = QPushButton("рџЋ« Р‘Р°Р»Р°РЅСЃ РєР°РїС‡Рё")
         self.check_captcha_btn.clicked.connect(self.check_captcha_balance)
-        self.check_captcha_btn.setToolTip("Проверить баланс RuCaptcha")
+        self.check_captcha_btn.setToolTip("РџСЂРѕРІРµСЂРёС‚СЊ Р±Р°Р»Р°РЅСЃ RuCaptcha")
         self.check_captcha_btn.setStyleSheet("""
             QPushButton {
                 background-color: #FF5722;
@@ -467,64 +502,64 @@ class AccountsTabExtended(QWidget):
         
         layout.addLayout(buttons_layout)
         
-        # Панель управления браузерами
+        # РџР°РЅРµР»СЊ СѓРїСЂР°РІР»РµРЅРёСЏ Р±СЂР°СѓР·РµСЂР°РјРё
         browser_panel = QGroupBox("Browser Management")
         browser_layout = QHBoxLayout()
         
-        self.open_browsers_btn = QPushButton("🌐 Открыть браузеры для логина")
+        self.open_browsers_btn = QPushButton("рџЊђ РћС‚РєСЂС‹С‚СЊ Р±СЂР°СѓР·РµСЂС‹ РґР»СЏ Р»РѕРіРёРЅР°")
         self.open_browsers_btn.clicked.connect(self.open_browsers_for_login)
-        self.open_browsers_btn.setToolTip("Открыть браузеры только для тех аккаунтов, где нужен логин")
+        self.open_browsers_btn.setToolTip("РћС‚РєСЂС‹С‚СЊ Р±СЂР°СѓР·РµСЂС‹ С‚РѕР»СЊРєРѕ РґР»СЏ С‚РµС… Р°РєРєР°СѓРЅС‚РѕРІ, РіРґРµ РЅСѓР¶РµРЅ Р»РѕРіРёРЅ")
         browser_layout.addWidget(self.open_browsers_btn)
         
-        self.browser_status_btn = QPushButton("📊 Состояние браузеров")
+        self.browser_status_btn = QPushButton("рџ“Љ РЎРѕСЃС‚РѕСЏРЅРёРµ Р±СЂР°СѓР·РµСЂРѕРІ")
         self.browser_status_btn.clicked.connect(self.show_browser_status)
-        self.browser_status_btn.setToolTip("Показать статус всех открытых браузеров")
+        self.browser_status_btn.setToolTip("РџРѕРєР°Р·Р°С‚СЊ СЃС‚Р°С‚СѓСЃ РІСЃРµС… РѕС‚РєСЂС‹С‚С‹С… Р±СЂР°СѓР·РµСЂРѕРІ")
         browser_layout.addWidget(self.browser_status_btn)
         
-        self.update_status_btn = QPushButton("🔄 Обновить статусы")
+        self.update_status_btn = QPushButton("рџ”„ РћР±РЅРѕРІРёС‚СЊ СЃС‚Р°С‚СѓСЃС‹")
         self.update_status_btn.clicked.connect(self.update_browser_status)
-        self.update_status_btn.setToolTip("Проверить залогинены ли браузеры")
+        self.update_status_btn.setToolTip("РџСЂРѕРІРµСЂРёС‚СЊ Р·Р°Р»РѕРіРёРЅРµРЅС‹ Р»Рё Р±СЂР°СѓР·РµСЂС‹")
         browser_layout.addWidget(self.update_status_btn)
         
-        self.minimize_browsers_btn = QPushButton("📉 Минимизировать браузеры")
+        self.minimize_browsers_btn = QPushButton("рџ“‰ РњРёРЅРёРјРёР·РёСЂРѕРІР°С‚СЊ Р±СЂР°СѓР·РµСЂС‹")
         self.minimize_browsers_btn.clicked.connect(self.minimize_all_browsers)
-        self.minimize_browsers_btn.setToolTip("Свернуть все браузеры в панель задач")
+        self.minimize_browsers_btn.setToolTip("РЎРІРµСЂРЅСѓС‚СЊ РІСЃРµ Р±СЂР°СѓР·РµСЂС‹ РІ РїР°РЅРµР»СЊ Р·Р°РґР°С‡")
         browser_layout.addWidget(self.minimize_browsers_btn)
         
-        self.close_browsers_btn = QPushButton("❌ Закрыть браузеры")
+        self.close_browsers_btn = QPushButton("вќЊ Р—Р°РєСЂС‹С‚СЊ Р±СЂР°СѓР·РµСЂС‹")
         self.close_browsers_btn.clicked.connect(self.close_all_browsers)
-        self.close_browsers_btn.setToolTip("Закрыть все открытые браузеры")
+        self.close_browsers_btn.setToolTip("Р—Р°РєСЂС‹С‚СЊ РІСЃРµ РѕС‚РєСЂС‹С‚С‹Рµ Р±СЂР°СѓР·РµСЂС‹")
         browser_layout.addWidget(self.close_browsers_btn)
         
         browser_panel.setLayout(browser_layout)
         layout.addWidget(browser_panel)
         
-        # Браузер менеджер
+        # Р‘СЂР°СѓР·РµСЂ РјРµРЅРµРґР¶РµСЂ
         self.browser_manager = None
         self.browser_thread = None
         
-        # Таблица аккаунтов
+        # РўР°Р±Р»РёС†Р° Р°РєРєР°СѓРЅС‚РѕРІ
         self.table = QTableWidget(0, 9)
         self.table.setHorizontalHeaderLabels([
-            "✓",  # Чекбокс
-            "Аккаунт",
-            "Статус",
-            "Авторизация",  # Изменено с "Логин"
-            "Профиль",
-            "Выбор профиля",  # Добавлено - выбор профиля для парсинга
-            "Прокси",
-            "Активность",  # Изменено с "Последнее использование"
-            "Куки"  # Изменено с "Заметки" - для ручного ввода куков
+            "вњ“",  # Р§РµРєР±РѕРєСЃ
+            "РђРєРєР°СѓРЅС‚",
+            "РЎС‚Р°С‚СѓСЃ",
+            "РђРІС‚РѕСЂРёР·Р°С†РёСЏ",  # РР·РјРµРЅРµРЅРѕ СЃ "Р›РѕРіРёРЅ"
+            "РџСЂРѕС„РёР»СЊ",
+            "Р’С‹Р±РѕСЂ РїСЂРѕС„РёР»СЏ",  # Р”РѕР±Р°РІР»РµРЅРѕ - РІС‹Р±РѕСЂ РїСЂРѕС„РёР»СЏ РґР»СЏ РїР°СЂСЃРёРЅРіР°
+            "РџСЂРѕРєСЃРё",
+            "РђРєС‚РёРІРЅРѕСЃС‚СЊ",  # РР·РјРµРЅРµРЅРѕ СЃ "РџРѕСЃР»РµРґРЅРµРµ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ"
+            "РљСѓРєРё"  # РР·РјРµРЅРµРЅРѕ СЃ "Р—Р°РјРµС‚РєРё" - РґР»СЏ СЂСѓС‡РЅРѕРіРѕ РІРІРѕРґР° РєСѓРєРѕРІ
         ])
         self.table.setItemDelegateForColumn(PROFILE_SELECT_COLUMN, ProfileComboDelegate())
         
-        # Обработчик двойного клика
+        # РћР±СЂР°Р±РѕС‚С‡РёРє РґРІРѕР№РЅРѕРіРѕ РєР»РёРєР°
         self.table.cellDoubleClicked.connect(self.on_table_double_click)
         
-        # Добавляем чекбокс "Выбрать все" в заголовок
+        # Р”РѕР±Р°РІР»СЏРµРј С‡РµРєР±РѕРєСЃ "Р’С‹Р±СЂР°С‚СЊ РІСЃРµ" РІ Р·Р°РіРѕР»РѕРІРѕРє
         self.select_all_checkbox = QCheckBox()
         self.select_all_checkbox.stateChanged.connect(self.toggle_select_all)
-        # Установим чекбокс в заголовок после создания строк в refresh()
+        # РЈСЃС‚Р°РЅРѕРІРёРј С‡РµРєР±РѕРєСЃ РІ Р·Р°РіРѕР»РѕРІРѕРє РїРѕСЃР»Рµ СЃРѕР·РґР°РЅРёСЏ СЃС‚СЂРѕРє РІ refresh()
         
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Fixed)
@@ -546,29 +581,29 @@ class AccountsTabExtended(QWidget):
         
         layout.addWidget(self.table)
         
-        # Убрали локальный Status and Activity - используем главный журнал внизу (файл 45)
+        # РЈР±СЂР°Р»Рё Р»РѕРєР°Р»СЊРЅС‹Р№ Status and Activity - РёСЃРїРѕР»СЊР·СѓРµРј РіР»Р°РІРЅС‹Р№ Р¶СѓСЂРЅР°Р» РІРЅРёР·Сѓ (С„Р°Р№Р» 45)
         
-        # Инициализация
+        # РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ
         self._accounts = []
         self.refresh()
     
     def toggle_select_all(self, state):
-        """Переключить выбор всех аккаунтов"""
+        """РџРµСЂРµРєР»СЋС‡РёС‚СЊ РІС‹Р±РѕСЂ РІСЃРµС… Р°РєРєР°СѓРЅС‚РѕРІ"""
         for row in range(self.table.rowCount()):
             checkbox = self.table.cellWidget(row, 0)
             if checkbox:
                 checkbox.setChecked(state == 2)  # 2 = Qt.Checked
-        self.log_action(f"{'Выбраны' if state == 2 else 'Сняты'} все аккаунты")
+        self.log_action(f"{'Р’С‹Р±СЂР°РЅС‹' if state == 2 else 'РЎРЅСЏС‚С‹'} РІСЃРµ Р°РєРєР°СѓРЅС‚С‹")
     
     def log_action(self, message):
-        """Добавить сообщение в главный журнал (файл 45)"""
-        # Логируем через главное окно
+        """Р”РѕР±Р°РІРёС‚СЊ СЃРѕРѕР±С‰РµРЅРёРµ РІ РіР»Р°РІРЅС‹Р№ Р¶СѓСЂРЅР°Р» (С„Р°Р№Р» 45)"""
+        # Р›РѕРіРёСЂСѓРµРј С‡РµСЂРµР· РіР»Р°РІРЅРѕРµ РѕРєРЅРѕ
         main_window = self.window()
         if hasattr(main_window, 'log_message'):
             main_window.log_message(message, "INFO")
     
     def _selected_rows(self) -> List[int]:
-        """Получить выбранные строки"""
+        """РџРѕР»СѓС‡РёС‚СЊ РІС‹Р±СЂР°РЅРЅС‹Рµ СЃС‚СЂРѕРєРё"""
         selected = []
         for row in range(self.table.rowCount()):
             checkbox = self.table.cellWidget(row, 0)
@@ -577,55 +612,55 @@ class AccountsTabExtended(QWidget):
         return selected
     
     def _current_account(self) -> Optional[Any]:
-        """Получить текущий выбранный аккаунт"""
+        """РџРѕР»СѓС‡РёС‚СЊ С‚РµРєСѓС‰РёР№ РІС‹Р±СЂР°РЅРЅС‹Р№ Р°РєРєР°СѓРЅС‚"""
         row = self.table.currentRow()
         if 0 <= row < len(self._accounts):
             return self._accounts[row]
         return None
     
     def _update_buttons(self):
-        """Обновить состояние кнопок"""
+        """РћР±РЅРѕРІРёС‚СЊ СЃРѕСЃС‚РѕСЏРЅРёРµ РєРЅРѕРїРѕРє"""
         has_selection = self._current_account() is not None
         self.edit_btn.setEnabled(has_selection)
         self.delete_btn.setEnabled(has_selection)
         
         selected_rows = self._selected_rows()
         self.login_btn.setEnabled(len(selected_rows) > 0)
-        # Автологин работает только для одного выбранного аккаунта
+        # РђРІС‚РѕР»РѕРіРёРЅ СЂР°Р±РѕС‚Р°РµС‚ С‚РѕР»СЊРєРѕ РґР»СЏ РѕРґРЅРѕРіРѕ РІС‹Р±СЂР°РЅРЅРѕРіРѕ Р°РєРєР°СѓРЅС‚Р°
         self.auto_login_btn.setEnabled(len(selected_rows) == 1)
-        # Proxy Manager всегда доступен
-        # self.test_proxy_btn.setEnabled(True)  # Убрали, т.к. всегда True
+        # Proxy Manager РІСЃРµРіРґР° РґРѕСЃС‚СѓРїРµРЅ
+        # self.test_proxy_btn.setEnabled(True)  # РЈР±СЂР°Р»Рё, С‚.Рє. РІСЃРµРіРґР° True
     
     def refresh(self):
-        """Обновить таблицу аккаунтов"""
-        # Получаем аккаунты и фильтруем demo_account
+        """РћР±РЅРѕРІРёС‚СЊ С‚Р°Р±Р»РёС†Сѓ Р°РєРєР°СѓРЅС‚РѕРІ"""
+        # РџРѕР»СѓС‡Р°РµРј Р°РєРєР°СѓРЅС‚С‹ Рё С„РёР»СЊС‚СЂСѓРµРј demo_account
         all_accounts = account_service.list_accounts()
         self._accounts = [acc for acc in all_accounts if acc.name != "demo_account"]
         self.table.setRowCount(len(self._accounts))
         self._reload_proxy_cache()
 
-        self.log_action(f"Загружено: {len(self._accounts)} аккаунтов")
+        self.log_action(f"Р—Р°РіСЂСѓР¶РµРЅРѕ: {len(self._accounts)} Р°РєРєР°СѓРЅС‚РѕРІ")
 
         self.table.blockSignals(True)
         for row, account in enumerate(self._accounts):
-            # Чекбокс
+            # Р§РµРєР±РѕРєСЃ
             checkbox = QCheckBox()
             checkbox.stateChanged.connect(self._update_buttons)
             self.table.setCellWidget(row, 0, checkbox)
             
-            # Данные аккаунта
+            # Р”Р°РЅРЅС‹Рµ Р°РєРєР°СѓРЅС‚Р°
             items = [
                 QTableWidgetItem(account.name),
                 QTableWidgetItem(self._get_status_label(account.status)),
-                QTableWidgetItem(self._get_auth_status(account)),  # Изменено
+                QTableWidgetItem(self._get_auth_status(account)),  # РР·РјРµРЅРµРЅРѕ
                 QTableWidgetItem(account.profile_path or f".profiles/{account.name}"),
-                None,  # Для комбобокса
-                None,  # Заполним комбобоксом прокси
-                QTableWidgetItem(self._get_activity_status(account)),  # Изменено
-                QTableWidgetItem(self._get_cookies_status(account))  # Показываем статус куков
+                None,  # Р”Р»СЏ РєРѕРјР±РѕР±РѕРєСЃР°
+                None,  # Р—Р°РїРѕР»РЅРёРј РєРѕРјР±РѕР±РѕРєСЃРѕРј РїСЂРѕРєСЃРё
+                QTableWidgetItem(self._get_activity_status(account)),  # РР·РјРµРЅРµРЅРѕ
+                QTableWidgetItem(self._get_cookies_status(account))  # РџРѕРєР°Р·С‹РІР°РµРј СЃС‚Р°С‚СѓСЃ РєСѓРєРѕРІ
             ]
 
-            # Устанавливаем элементы
+            # РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј СЌР»РµРјРµРЅС‚С‹
             for col, item in enumerate(items):
                 if item is not None:
                     item.setFlags(item.flags() & ~Qt.ItemIsEditable)
@@ -646,7 +681,7 @@ class AccountsTabExtended(QWidget):
 
     @staticmethod
     def _normalize_profile_path(value: Optional[str], account_name: str) -> str:
-        """Привести значение профиля к абсолютному пути."""
+        """РџСЂРёРІРµСЃС‚Рё Р·РЅР°С‡РµРЅРёРµ РїСЂРѕС„РёР»СЏ Рє Р°Р±СЃРѕР»СЋС‚РЅРѕРјСѓ РїСѓС‚Рё."""
         base_dir = Path("C:/AI/yandex")
 
         if value:
@@ -665,12 +700,12 @@ class AccountsTabExtended(QWidget):
     def _format_profile_label(path: str, subtitle: str = "") -> str:
         tail = Path(path).name
         hint = f" {subtitle}" if subtitle else ""
-        return f"{tail}{hint} — {path}"
+        return f"{tail}{hint} вЂ” {path}"
 
     def _profile_options(self, account):
-        """Сформировать список доступных профилей для аккаунта."""
+        """РЎС„РѕСЂРјРёСЂРѕРІР°С‚СЊ СЃРїРёСЃРѕРє РґРѕСЃС‚СѓРїРЅС‹С… РїСЂРѕС„РёР»РµР№ РґР»СЏ Р°РєРєР°СѓРЅС‚Р°."""
         current = self._normalize_profile_path(account.profile_path, account.name)
-        options = [(current, self._format_profile_label(current, "(текущий)"))]
+        options = [(current, self._format_profile_label(current, "(С‚РµРєСѓС‰РёР№)"))]
 
         personal_default = self._normalize_profile_path(f".profiles/{account.name}", account.name)
         if personal_default not in {opt[0] for opt in options}:
@@ -679,19 +714,19 @@ class AccountsTabExtended(QWidget):
         return options
 
     def _profile_value_from_account(self, account):
-        """Определить текущий профиль из пути аккаунта."""
+        """РћРїСЂРµРґРµР»РёС‚СЊ С‚РµРєСѓС‰РёР№ РїСЂРѕС„РёР»СЊ РёР· РїСѓС‚Рё Р°РєРєР°СѓРЅС‚Р°."""
         return self._normalize_profile_path(account.profile_path, account.name)
 
     @staticmethod
     def _profile_label(options, value):
-        """Получить отображаемую подпись для значения профиля."""
+        """РџРѕР»СѓС‡РёС‚СЊ РѕС‚РѕР±СЂР°Р¶Р°РµРјСѓСЋ РїРѕРґРїРёСЃСЊ РґР»СЏ Р·РЅР°С‡РµРЅРёСЏ РїСЂРѕС„РёР»СЏ."""
         for option_value, label in options:
             if option_value == value:
                 return label
         return AccountsTabExtended._format_profile_label(value)
 
     # ------------------------------------------------------------------
-    # Работа с прокси
+    # Р Р°Р±РѕС‚Р° СЃ РїСЂРѕРєСЃРё
     # ------------------------------------------------------------------
 
     def _reload_proxy_cache(self) -> None:
@@ -738,6 +773,40 @@ class AccountsTabExtended(QWidget):
         proxy = self._proxy_by_uri.get(proxy_uri)
         return proxy.id if proxy else None
 
+    def _resolve_proxy_payload(self, account) -> Tuple[Optional[Dict[str, str]], Optional[str]]:
+        """Возвращает конфиг прокси для Playwright и полноценный URI с учётом учётных данных."""
+        proxy_obj = None
+        proxy_id = getattr(account, "proxy_id", None)
+        if proxy_id:
+            proxy_obj = self._proxy_by_id.get(proxy_id) or self._proxy_manager.get(proxy_id)
+        elif getattr(account, "proxy", None):
+            proxy_obj = self._proxy_by_uri.get(account.proxy)
+
+        if proxy_obj:
+            config = proxy_obj.playwright_config()
+            server = config.get("server")
+            if server and "://" not in server:
+                config["server"] = f"http://{server}"
+            return config, proxy_obj.uri(include_credentials=True)
+
+        raw_proxy = (getattr(account, "proxy", "") or "").strip()
+        if raw_proxy:
+            parsed = parse_proxy(raw_proxy)
+            if parsed:
+                server = parsed.get("server")
+                if server and "://" not in server:
+                    parsed["server"] = f"http://{server}"
+                scheme, host = parsed["server"].split("://", 1)
+                username = parsed.get("username")
+                password = parsed.get("password") or ""
+                if username:
+                    uri = f"{scheme}://{username}:{password}@{host}"
+                else:
+                    uri = f"{scheme}://{host}"
+                return parsed, uri
+
+        return None, None
+
     def _on_proxy_changed(self, combo: QComboBox) -> None:
         account_id = combo.property("account_id")
         if account_id is None:
@@ -746,7 +815,7 @@ class AccountsTabExtended(QWidget):
         try:
             updated = set_account_proxy(account_id, proxy_id, strategy="fixed")
         except Exception as exc:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось привязать прокси: {exc}")
+            QMessageBox.critical(self, "РћС€РёР±РєР°", f"РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРёРІСЏР·Р°С‚СЊ РїСЂРѕРєСЃРё: {exc}")
             self.refresh()
             return
 
@@ -758,89 +827,89 @@ class AccountsTabExtended(QWidget):
                 break
 
         account_name = combo.property("account_name") or account_id
-        self.log_action(f"Прокси для {account_name}: {combo.currentText()}")
+        self.log_action(f"РџСЂРѕРєСЃРё РґР»СЏ {account_name}: {combo.currentText()}")
     
     def _get_status_label(self, status):
-        """Получить метку статуса"""
+        """РџРѕР»СѓС‡РёС‚СЊ РјРµС‚РєСѓ СЃС‚Р°С‚СѓСЃР°"""
         labels = {
-            "ok": "Готов",
-            "cooldown": "Пауза",
-            "captcha": "Капча",
-            "banned": "Забанен",
-            "disabled": "Отключен",
-            "error": "Ошибка"
+            "ok": "Р“РѕС‚РѕРІ",
+            "cooldown": "РџР°СѓР·Р°",
+            "captcha": "РљР°РїС‡Р°",
+            "banned": "Р—Р°Р±Р°РЅРµРЅ",
+            "disabled": "РћС‚РєР»СЋС‡РµРЅ",
+            "error": "РћС€РёР±РєР°"
         }
         return labels.get(status, status)
     
     def _get_login_status(self, account):
-        """Проверить статус логина"""
-        # Проверяем наличие cookies в профиле
+        """РџСЂРѕРІРµСЂРёС‚СЊ СЃС‚Р°С‚СѓСЃ Р»РѕРіРёРЅР°"""
+        # РџСЂРѕРІРµСЂСЏРµРј РЅР°Р»РёС‡РёРµ cookies РІ РїСЂРѕС„РёР»Рµ
         profile_path = Path(account.profile_path)
         cookies_file = profile_path / "Default" / "Cookies"
         
         if cookies_file.exists():
-            # Проверяем время последней модификации
+            # РџСЂРѕРІРµСЂСЏРµРј РІСЂРµРјСЏ РїРѕСЃР»РµРґРЅРµР№ РјРѕРґРёС„РёРєР°С†РёРё
             mtime = datetime.fromtimestamp(cookies_file.stat().st_mtime)
             age = datetime.now() - mtime
             
-            if age.days < 7:  # Cookies свежие (меньше недели)
-                return "✅ Залогинен"
+            if age.days < 7:  # Cookies СЃРІРµР¶РёРµ (РјРµРЅСЊС€Рµ РЅРµРґРµР»Рё)
+                return "вњ… Р—Р°Р»РѕРіРёРЅРµРЅ"
             else:
-                return "⚠️ Требует обновления"
-        return "❌ Не залогинен"
+                return "вљ пёЏ РўСЂРµР±СѓРµС‚ РѕР±РЅРѕРІР»РµРЅРёСЏ"
+        return "вќЊ РќРµ Р·Р°Р»РѕРіРёРЅРµРЅ"
     
     def _is_logged_in(self, account):
-        """Проверить залогинен ли аккаунт"""
-        # Всегда возвращаем False чтобы реально проверить через Wordstat
+        """РџСЂРѕРІРµСЂРёС‚СЊ Р·Р°Р»РѕРіРёРЅРµРЅ Р»Рё Р°РєРєР°СѓРЅС‚"""
+        # Р’СЃРµРіРґР° РІРѕР·РІСЂР°С‰Р°РµРј False С‡С‚РѕР±С‹ СЂРµР°Р»СЊРЅРѕ РїСЂРѕРІРµСЂРёС‚СЊ С‡РµСЂРµР· Wordstat
         return False
     
     def _format_timestamp(self, ts):
-        """Форматировать временную метку"""
+        """Р¤РѕСЂРјР°С‚РёСЂРѕРІР°С‚СЊ РІСЂРµРјРµРЅРЅСѓСЋ РјРµС‚РєСѓ"""
         if ts:
             return ts.strftime("%Y-%m-%d %H:%M")
         return ""
     
     def _get_auth_status(self, account):
-        """Получить статус авторизации"""
-        # Проверяем куки в выбранном профиле
+        """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ Р°РІС‚РѕСЂРёР·Р°С†РёРё"""
+        # РџСЂРѕРІРµСЂСЏРµРј РєСѓРєРё РІ РІС‹Р±СЂР°РЅРЅРѕРј РїСЂРѕС„РёР»Рµ
         profile_path = self._normalize_profile_path(account.profile_path, account.name)
         from pathlib import Path
         cookies_file = Path(profile_path) / "Default" / "Cookies"
         
         if cookies_file.exists() and cookies_file.stat().st_size > 1000:
-            # Проверяем свежесть куков
+            # РџСЂРѕРІРµСЂСЏРµРј СЃРІРµР¶РµСЃС‚СЊ РєСѓРєРѕРІ
             from datetime import datetime
             age_days = (datetime.now().timestamp() - cookies_file.stat().st_mtime) / 86400
             if age_days < 7:
-                return "Залогинен"
+                return "Р—Р°Р»РѕРіРёРЅРµРЅ"
             else:
-                return "Куки устарели"
+                return "РљСѓРєРё СѓСЃС‚Р°СЂРµР»Рё"
         
-        return "Не залогинен"
+        return "РќРµ Р·Р°Р»РѕРіРёРЅРµРЅ"
     
     def _format_proxy(self, proxy):
-        """Форматировать прокси для отображения"""
+        """Р¤РѕСЂРјР°С‚РёСЂРѕРІР°С‚СЊ РїСЂРѕРєСЃРё РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ"""
         if not proxy:
             return "No proxy"
         
-        # Извлекаем IP из прокси
+        # РР·РІР»РµРєР°РµРј IP РёР· РїСЂРѕРєСЃРё
         if "@" in str(proxy):
-            # Формат: http://user:pass@ip:port
+            # Р¤РѕСЂРјР°С‚: http://user:pass@ip:port
             parts = str(proxy).split("@")
             if len(parts) > 1:
                 ip_port = parts[1].replace("http://", "")
-                # Показываем только IP и порт
+                # РџРѕРєР°Р·С‹РІР°РµРј С‚РѕР»СЊРєРѕ IP Рё РїРѕСЂС‚
                 if ":" in ip_port:
                     ip = ip_port.split(":")[0]
-                    # Определяем страну по IP
+                    # РћРїСЂРµРґРµР»СЏРµРј СЃС‚СЂР°РЅСѓ РїРѕ IP
                     if ip.startswith("213.139"):
-                        return f"KZ {ip}"  # KZ вместо флага
+                        return f"KZ {ip}"  # KZ РІРјРµСЃС‚Рѕ С„Р»Р°РіР°
                     return ip
         return str(proxy)[:20] + "..."
     
     def _get_activity_status(self, account):
-        """Получить статус активности аккаунта"""
-        # Проверяем cookies для определения активности
+        """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ Р°РєС‚РёРІРЅРѕСЃС‚Рё Р°РєРєР°СѓРЅС‚Р°"""
+        # РџСЂРѕРІРµСЂСЏРµРј cookies РґР»СЏ РѕРїСЂРµРґРµР»РµРЅРёСЏ Р°РєС‚РёРІРЅРѕСЃС‚Рё
         profile_path = Path(account.profile_path if account.profile_path else f".profiles/{account.name}")
         cookies_file = profile_path / "Default" / "Cookies"
         
@@ -849,21 +918,21 @@ class AccountsTabExtended(QWidget):
             mtime = datetime.fromtimestamp(cookies_file.stat().st_mtime)
             age = datetime.now() - mtime
             
-            if age.total_seconds() < 300:  # 5 минут
-                return "Активен сейчас"
-            elif age.total_seconds() < 3600:  # 1 час
-                return "Активен недавно"
+            if age.total_seconds() < 300:  # 5 РјРёРЅСѓС‚
+                return "РђРєС‚РёРІРµРЅ СЃРµР№С‡Р°СЃ"
+            elif age.total_seconds() < 3600:  # 1 С‡Р°СЃ
+                return "РђРєС‚РёРІРµРЅ РЅРµРґР°РІРЅРѕ"
             elif age.days < 1:
-                return "Использован сегодня"
+                return "РСЃРїРѕР»СЊР·РѕРІР°РЅ СЃРµРіРѕРґРЅСЏ"
             elif age.days < 7:
-                return f"{age.days} дн. назад"
+                return f"{age.days} РґРЅ. РЅР°Р·Р°Рґ"
             else:
-                return "Неактивен"
+                return "РќРµР°РєС‚РёРІРµРЅ"
         else:
-            return "Не использован"
+            return "РќРµ РёСЃРїРѕР»СЊР·РѕРІР°РЅ"
     
     def add_account(self):
-        """Добавить новый аккаунт"""
+        """Р”РѕР±Р°РІРёС‚СЊ РЅРѕРІС‹Р№ Р°РєРєР°СѓРЅС‚"""
         from ..app.main import AccountDialog
         
         dialog = AccountDialog(self)
@@ -874,12 +943,12 @@ class AccountsTabExtended(QWidget):
                     account_service.create_account(**data)
                     self.refresh()
                     self.accounts_changed.emit()
-                    QMessageBox.information(self, "Успех", "Аккаунт добавлен")
+                    QMessageBox.information(self, "РЈСЃРїРµС…", "РђРєРєР°СѓРЅС‚ РґРѕР±Р°РІР»РµРЅ")
                 except Exception as e:
-                    QMessageBox.warning(self, "Ошибка", str(e))
+                    QMessageBox.warning(self, "РћС€РёР±РєР°", str(e))
     
     def edit_account(self):
-        """Редактировать аккаунт"""
+        """Р РµРґР°РєС‚РёСЂРѕРІР°С‚СЊ Р°РєРєР°СѓРЅС‚"""
         account = self._current_account()
         if not account:
             return
@@ -888,7 +957,7 @@ class AccountsTabExtended(QWidget):
         import json
         from pathlib import Path
         
-        # Загружаем данные из accounts.json
+        # Р—Р°РіСЂСѓР¶Р°РµРј РґР°РЅРЅС‹Рµ РёР· accounts.json
         password = ""
         secret_answer = ""
         accounts_file = Path("C:/AI/yandex/configs/accounts.json")
@@ -918,28 +987,28 @@ class AccountsTabExtended(QWidget):
                     self.refresh()
                     self.accounts_changed.emit()
                 except Exception as e:
-                    QMessageBox.warning(self, "Ошибка", str(e))
+                    QMessageBox.warning(self, "РћС€РёР±РєР°", str(e))
     
     def delete_account(self):
-        """Удалить аккаунт"""
+        """РЈРґР°Р»РёС‚СЊ Р°РєРєР°СѓРЅС‚"""
         account = self._current_account()
         if not account:
             return
             
         reply = QMessageBox.question(
-            self, "Подтверждение",
-            f"Удалить аккаунт '{account.name}'?\n\n"
-            f"Это также удалит его из accounts.json\n"
-            f"Профиль браузера НЕ будет удален",
+            self, "РџРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ",
+            f"РЈРґР°Р»РёС‚СЊ Р°РєРєР°СѓРЅС‚ '{account.name}'?\n\n"
+            f"Р­С‚Рѕ С‚Р°РєР¶Рµ СѓРґР°Р»РёС‚ РµРіРѕ РёР· accounts.json\n"
+            f"РџСЂРѕС„РёР»СЊ Р±СЂР°СѓР·РµСЂР° РќР• Р±СѓРґРµС‚ СѓРґР°Р»РµРЅ",
             QMessageBox.Yes | QMessageBox.No
         )
         
         if reply == QMessageBox.Yes:
             try:
-                # Удаляем из базы данных
+                # РЈРґР°Р»СЏРµРј РёР· Р±Р°Р·С‹ РґР°РЅРЅС‹С…
                 account_service.delete_account(account.id)
                 
-                # Удаляем из accounts.json
+                # РЈРґР°Р»СЏРµРј РёР· accounts.json
                 import json
                 from pathlib import Path
                 
@@ -948,61 +1017,61 @@ class AccountsTabExtended(QWidget):
                     with open(accounts_file, 'r', encoding='utf-8') as f:
                         accounts = json.load(f)
                     
-                    # Удаляем аккаунт из списка
+                    # РЈРґР°Р»СЏРµРј Р°РєРєР°СѓРЅС‚ РёР· СЃРїРёСЃРєР°
                     accounts = [acc for acc in accounts if acc.get("login") != account.name]
                     
-                    # Сохраняем обратно
+                    # РЎРѕС…СЂР°РЅСЏРµРј РѕР±СЂР°С‚РЅРѕ
                     with open(accounts_file, 'w', encoding='utf-8') as f:
                         json.dump(accounts, f, ensure_ascii=False, indent=2)
                     
-                    self.log_action(f"Аккаунт {account.name} удален из accounts.json")
+                    self.log_action(f"РђРєРєР°СѓРЅС‚ {account.name} СѓРґР°Р»РµРЅ РёР· accounts.json")
                 
                 self.refresh()
                 self.accounts_changed.emit()
-                QMessageBox.information(self, "Успех", f"Аккаунт {account.name} удален")
+                QMessageBox.information(self, "РЈСЃРїРµС…", f"РђРєРєР°СѓРЅС‚ {account.name} СѓРґР°Р»РµРЅ")
             except Exception as e:
-                QMessageBox.warning(self, "Ошибка", str(e))
+                QMessageBox.warning(self, "РћС€РёР±РєР°", str(e))
     
     def import_accounts(self):
-        """Импортировать аккаунты из файла"""
+        """РРјРїРѕСЂС‚РёСЂРѕРІР°С‚СЊ Р°РєРєР°СѓРЅС‚С‹ РёР· С„Р°Р№Р»Р°"""
         filename, _ = QFileDialog.getOpenFileName(
             self,
-            "Выберите файл с аккаунтами",
+            "Р’С‹Р±РµСЂРёС‚Рµ С„Р°Р№Р» СЃ Р°РєРєР°СѓРЅС‚Р°РјРё",
             "",
             "Text files (*.txt);;CSV files (*.csv);;All files (*.*)"
         )
         
         if filename:
             try:
-                # TODO: Реализовать импорт
-                QMessageBox.information(self, "Импорт", "Функция в разработке")
+                # TODO: Р РµР°Р»РёР·РѕРІР°С‚СЊ РёРјРїРѕСЂС‚
+                QMessageBox.information(self, "РРјРїРѕСЂС‚", "Р¤СѓРЅРєС†РёСЏ РІ СЂР°Р·СЂР°Р±РѕС‚РєРµ")
             except Exception as e:
-                QMessageBox.warning(self, "Ошибка импорта", str(e))
+                QMessageBox.warning(self, "РћС€РёР±РєР° РёРјРїРѕСЂС‚Р°", str(e))
     
     def test_proxy_selected(self):
-        """Проверить прокси выбранного аккаунта"""
+        """РџСЂРѕРІРµСЂРёС‚СЊ РїСЂРѕРєСЃРё РІС‹Р±СЂР°РЅРЅРѕРіРѕ Р°РєРєР°СѓРЅС‚Р°"""
         account = self._current_account()
         if not account:
-            QMessageBox.warning(self, "Внимание", "Выберите аккаунт для проверки прокси")
+            QMessageBox.warning(self, "Р’РЅРёРјР°РЅРёРµ", "Р’С‹Р±РµСЂРёС‚Рµ Р°РєРєР°СѓРЅС‚ РґР»СЏ РїСЂРѕРІРµСЂРєРё РїСЂРѕРєСЃРё")
             return
         
         if not account.proxy:
-            QMessageBox.warning(self, "Внимание", f"У аккаунта {account.name} не указан прокси")
+            QMessageBox.warning(self, "Р’РЅРёРјР°РЅРёРµ", f"РЈ Р°РєРєР°СѓРЅС‚Р° {account.name} РЅРµ СѓРєР°Р·Р°РЅ РїСЂРѕРєСЃРё")
             return
         
-        # Импортируем сервис проверки прокси
+        # РРјРїРѕСЂС‚РёСЂСѓРµРј СЃРµСЂРІРёСЃ РїСЂРѕРІРµСЂРєРё РїСЂРѕРєСЃРё
         from ..services.proxy_check import test_proxy
         import asyncio
         
-        # Создаем диалог прогресса
+        # РЎРѕР·РґР°РµРј РґРёР°Р»РѕРі РїСЂРѕРіСЂРµСЃСЃР°
         progress_dialog = QMessageBox(self)
-        progress_dialog.setWindowTitle("Проверка прокси")
-        progress_dialog.setText(f"Проверка прокси для аккаунта {account.name}...\n\n{account.proxy}")
+        progress_dialog.setWindowTitle("РџСЂРѕРІРµСЂРєР° РїСЂРѕРєСЃРё")
+        progress_dialog.setText(f"РџСЂРѕРІРµСЂРєР° РїСЂРѕРєСЃРё РґР»СЏ Р°РєРєР°СѓРЅС‚Р° {account.name}...\n\n{account.proxy}")
         progress_dialog.setStandardButtons(QMessageBox.NoButton)
         progress_dialog.setModal(True)
         progress_dialog.show()
         
-        # Запускаем проверку в отдельном потоке
+        # Р—Р°РїСѓСЃРєР°РµРј РїСЂРѕРІРµСЂРєСѓ РІ РѕС‚РґРµР»СЊРЅРѕРј РїРѕС‚РѕРєРµ
         def run_test():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -1022,59 +1091,59 @@ class AccountsTabExtended(QWidget):
         
         progress_dialog.close()
         
-        # Показываем результат
+        # РџРѕРєР°Р·С‹РІР°РµРј СЂРµР·СѓР»СЊС‚Р°С‚
         if 'result' not in result_container:
-            QMessageBox.warning(self, "Ошибка", "Проверка прокси заняла слишком много времени (>15 сек)")
+            QMessageBox.warning(self, "РћС€РёР±РєР°", "РџСЂРѕРІРµСЂРєР° РїСЂРѕРєСЃРё Р·Р°РЅСЏР»Р° СЃР»РёС€РєРѕРј РјРЅРѕРіРѕ РІСЂРµРјРµРЅРё (>15 СЃРµРє)")
             return
         
         result = result_container['result']
         
         if result['ok']:
-            msg = f"✅ Прокси работает!\n\n"
-            msg += f"Аккаунт: {account.name}\n"
-            msg += f"Прокси: {account.proxy}\n"
+            msg = f"вњ… РџСЂРѕРєСЃРё СЂР°Р±РѕС‚Р°РµС‚!\n\n"
+            msg += f"РђРєРєР°СѓРЅС‚: {account.name}\n"
+            msg += f"РџСЂРѕРєСЃРё: {account.proxy}\n"
             msg += f"IP: {result['ip']}\n"
-            msg += f"Задержка: {result['latency_ms']} мс"
-            QMessageBox.information(self, "Результат проверки", msg)
-            self.log_action(f"Прокси {account.proxy} работает (IP: {result['ip']}, {result['latency_ms']}ms)")
+            msg += f"Р—Р°РґРµСЂР¶РєР°: {result['latency_ms']} РјСЃ"
+            QMessageBox.information(self, "Р РµР·СѓР»СЊС‚Р°С‚ РїСЂРѕРІРµСЂРєРё", msg)
+            self.log_action(f"РџСЂРѕРєСЃРё {account.proxy} СЂР°Р±РѕС‚Р°РµС‚ (IP: {result['ip']}, {result['latency_ms']}ms)")
         else:
-            msg = f"❌ Прокси НЕ работает!\n\n"
-            msg += f"Аккаунт: {account.name}\n"
-            msg += f"Прокси: {account.proxy}\n"
-            msg += f"Ошибка: {result['error']}\n"
-            msg += f"Задержка: {result['latency_ms']} мс"
-            QMessageBox.warning(self, "Результат проверки", msg)
-            self.log_action(f"Прокси {account.proxy} НЕ работает: {result['error']}")
+            msg = f"вќЊ РџСЂРѕРєСЃРё РќР• СЂР°Р±РѕС‚Р°РµС‚!\n\n"
+            msg += f"РђРєРєР°СѓРЅС‚: {account.name}\n"
+            msg += f"РџСЂРѕРєСЃРё: {account.proxy}\n"
+            msg += f"РћС€РёР±РєР°: {result['error']}\n"
+            msg += f"Р—Р°РґРµСЂР¶РєР°: {result['latency_ms']} РјСЃ"
+            QMessageBox.warning(self, "Р РµР·СѓР»СЊС‚Р°С‚ РїСЂРѕРІРµСЂРєРё", msg)
+            self.log_action(f"РџСЂРѕРєСЃРё {account.proxy} РќР• СЂР°Р±РѕС‚Р°РµС‚: {result['error']}")
     
     def open_proxy_manager(self):
-        """Открыть Proxy Manager (немодальное окно)"""
+        """РћС‚РєСЂС‹С‚СЊ Proxy Manager (РЅРµРјРѕРґР°Р»СЊРЅРѕРµ РѕРєРЅРѕ)"""
         from .proxy_manager import ProxyManagerDialog
 
-        # Создаем и показываем окно
+        # РЎРѕР·РґР°РµРј Рё РїРѕРєР°Р·С‹РІР°РµРј РѕРєРЅРѕ
         proxy_manager = ProxyManagerDialog(self)
         proxy_manager.finished.connect(lambda *_: self.refresh())
-        proxy_manager.show()  # НЕ exec() - немодальное!
+        proxy_manager.show()  # РќР• exec() - РЅРµРјРѕРґР°Р»СЊРЅРѕРµ!
 
-        self.log_action("Открыт Proxy Manager")
+        self.log_action("РћС‚РєСЂС‹С‚ Proxy Manager")
     
     def check_captcha_balance(self):
-        """Проверить баланс RuCaptcha"""
-        # Пока используем общий ключ из файла
-        # TODO: В будущем брать ключ из поля captcha_key аккаунта
+        """РџСЂРѕРІРµСЂРёС‚СЊ Р±Р°Р»Р°РЅСЃ RuCaptcha"""
+        # РџРѕРєР° РёСЃРїРѕР»СЊР·СѓРµРј РѕР±С‰РёР№ РєР»СЋС‡ РёР· С„Р°Р№Р»Р°
+        # TODO: Р’ Р±СѓРґСѓС‰РµРј Р±СЂР°С‚СЊ РєР»СЋС‡ РёР· РїРѕР»СЏ captcha_key Р°РєРєР°СѓРЅС‚Р°
         CAPTCHA_KEY = "8f00b4cb9b77d982abb77260a168f976"
         
         from ..services.captcha import RuCaptchaClient
         import asyncio
         
-        # Создаем диалог прогресса
+        # РЎРѕР·РґР°РµРј РґРёР°Р»РѕРі РїСЂРѕРіСЂРµСЃСЃР°
         progress_dialog = QMessageBox(self)
-        progress_dialog.setWindowTitle("Проверка баланса капчи")
-        progress_dialog.setText("Проверка баланса RuCaptcha...\n\nОжидайте...")
+        progress_dialog.setWindowTitle("РџСЂРѕРІРµСЂРєР° Р±Р°Р»Р°РЅСЃР° РєР°РїС‡Рё")
+        progress_dialog.setText("РџСЂРѕРІРµСЂРєР° Р±Р°Р»Р°РЅСЃР° RuCaptcha...\n\nРћР¶РёРґР°Р№С‚Рµ...")
         progress_dialog.setStandardButtons(QMessageBox.NoButton)
         progress_dialog.setModal(True)
         progress_dialog.show()
         
-        # Запускаем проверку в отдельном потоке
+        # Р—Р°РїСѓСЃРєР°РµРј РїСЂРѕРІРµСЂРєСѓ РІ РѕС‚РґРµР»СЊРЅРѕРј РїРѕС‚РѕРєРµ
         def run_check():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -1095,38 +1164,38 @@ class AccountsTabExtended(QWidget):
         
         progress_dialog.close()
         
-        # Показываем результат
+        # РџРѕРєР°Р·С‹РІР°РµРј СЂРµР·СѓР»СЊС‚Р°С‚
         if 'result' not in result_container:
-            QMessageBox.warning(self, "Ошибка", "Проверка баланса заняла слишком много времени (>15 сек)")
+            QMessageBox.warning(self, "РћС€РёР±РєР°", "РџСЂРѕРІРµСЂРєР° Р±Р°Р»Р°РЅСЃР° Р·Р°РЅСЏР»Р° СЃР»РёС€РєРѕРј РјРЅРѕРіРѕ РІСЂРµРјРµРЅРё (>15 СЃРµРє)")
             return
         
         result = result_container['result']
         
         if result['ok']:
             balance = result['balance']
-            msg = f"✅ RuCaptcha баланс\n\n"
-            msg += f"Ключ: {CAPTCHA_KEY[:20]}...\n"
-            msg += f"Баланс: {balance:.2f} руб\n\n"
+            msg = f"вњ… RuCaptcha Р±Р°Р»Р°РЅСЃ\n\n"
+            msg += f"РљР»СЋС‡: {CAPTCHA_KEY[:20]}...\n"
+            msg += f"Р‘Р°Р»Р°РЅСЃ: {balance:.2f} СЂСѓР±\n\n"
             
-            # Прикинем сколько капч можно решить
-            price_per_captcha = 0.10  # примерно 10 копеек за капчу
+            # РџСЂРёРєРёРЅРµРј СЃРєРѕР»СЊРєРѕ РєР°РїС‡ РјРѕР¶РЅРѕ СЂРµС€РёС‚СЊ
+            price_per_captcha = 0.10  # РїСЂРёРјРµСЂРЅРѕ 10 РєРѕРїРµРµРє Р·Р° РєР°РїС‡Сѓ
             captchas_available = int(balance / price_per_captcha)
-            msg += f"Примерно {captchas_available} капч можно решить"
+            msg += f"РџСЂРёРјРµСЂРЅРѕ {captchas_available} РєР°РїС‡ РјРѕР¶РЅРѕ СЂРµС€РёС‚СЊ"
             
-            QMessageBox.information(self, "Баланс капчи", msg)
-            self.log_action(f"RuCaptcha баланс: {balance:.2f} руб (~{captchas_available} капч)")
+            QMessageBox.information(self, "Р‘Р°Р»Р°РЅСЃ РєР°РїС‡Рё", msg)
+            self.log_action(f"RuCaptcha Р±Р°Р»Р°РЅСЃ: {balance:.2f} СЂСѓР± (~{captchas_available} РєР°РїС‡)")
         else:
-            msg = f"❌ Ошибка проверки баланса!\n\n"
-            msg += f"Ключ: {CAPTCHA_KEY[:20]}...\n"
-            msg += f"Ошибка: {result['error']}"
-            QMessageBox.warning(self, "Ошибка капчи", msg)
-            self.log_action(f"RuCaptcha ошибка: {result['error']}")
+            msg = f"вќЊ РћС€РёР±РєР° РїСЂРѕРІРµСЂРєРё Р±Р°Р»Р°РЅСЃР°!\n\n"
+            msg += f"РљР»СЋС‡: {CAPTCHA_KEY[:20]}...\n"
+            msg += f"РћС€РёР±РєР°: {result['error']}"
+            QMessageBox.warning(self, "РћС€РёР±РєР° РєР°РїС‡Рё", msg)
+            self.log_action(f"RuCaptcha РѕС€РёР±РєР°: {result['error']}")
     
     def login_selected(self):
-        """Открыть браузеры для ручного логина с учетом привязанного прокси."""
+        """РћС‚РєСЂС‹С‚СЊ Р±СЂР°СѓР·РµСЂС‹ РґР»СЏ СЂСѓС‡РЅРѕРіРѕ Р»РѕРіРёРЅР° СЃ СѓС‡РµС‚РѕРј РїСЂРёРІСЏР·Р°РЅРЅРѕРіРѕ РїСЂРѕРєСЃРё."""
         selected_rows = self._selected_rows()
         if not selected_rows:
-            QMessageBox.warning(self, "Внимание", "Выберите аккаунты для логина")
+            QMessageBox.warning(self, "Р’РЅРёРјР°РЅРёРµ", "Р’С‹Р±РµСЂРёС‚Рµ Р°РєРєР°СѓРЅС‚С‹ РґР»СЏ Р»РѕРіРёРЅР°")
             return
 
         self._release_browser_handles()
@@ -1145,115 +1214,115 @@ class AccountsTabExtended(QWidget):
         if opened:
             QMessageBox.information(
                 self,
-                "Готово",
-                f"Открыто {opened} браузеров. Проверьте авторизацию и обновите статусы.",
+                "Р“РѕС‚РѕРІРѕ",
+                f"РћС‚РєСЂС‹С‚Рѕ {opened} Р±СЂР°СѓР·РµСЂРѕРІ. РџСЂРѕРІРµСЂСЊС‚Рµ Р°РІС‚РѕСЂРёР·Р°С†РёСЋ Рё РѕР±РЅРѕРІРёС‚Рµ СЃС‚Р°С‚СѓСЃС‹.",
             )
         else:
             QMessageBox.warning(
                 self,
-                "Ошибка",
-                "Не удалось открыть браузеры для выбранных аккаунтов.",
+                "РћС€РёР±РєР°",
+                "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ Р±СЂР°СѓР·РµСЂС‹ РґР»СЏ РІС‹Р±СЂР°РЅРЅС‹С… Р°РєРєР°СѓРЅС‚РѕРІ.",
             )
     
     def auto_login_selected(self):
-        """Автоматическая авторизация ВЫБРАННЫХ аккаунтов (где стоят галочки)"""
-        # Берем только выбранные аккаунты
+        """РђРІС‚РѕРјР°С‚РёС‡РµСЃРєР°СЏ Р°РІС‚РѕСЂРёР·Р°С†РёСЏ Р’Р«Р‘Р РђРќРќР«РҐ Р°РєРєР°СѓРЅС‚РѕРІ (РіРґРµ СЃС‚РѕСЏС‚ РіР°Р»РѕС‡РєРё)"""
+        # Р‘РµСЂРµРј С‚РѕР»СЊРєРѕ РІС‹Р±СЂР°РЅРЅС‹Рµ Р°РєРєР°СѓРЅС‚С‹
         selected_rows = self._selected_rows()
         
         if not selected_rows:
-            QMessageBox.warning(self, "Внимание", "Выберите аккаунты для автологина (поставьте галочки)")
+            QMessageBox.warning(self, "Р’РЅРёРјР°РЅРёРµ", "Р’С‹Р±РµСЂРёС‚Рµ Р°РєРєР°СѓРЅС‚С‹ РґР»СЏ Р°РІС‚РѕР»РѕРіРёРЅР° (РїРѕСЃС‚Р°РІСЊС‚Рµ РіР°Р»РѕС‡РєРё)")
             return
         
-        # Если выбрано больше одного - спрашиваем подтверждение
+        # Р•СЃР»Рё РІС‹Р±СЂР°РЅРѕ Р±РѕР»СЊС€Рµ РѕРґРЅРѕРіРѕ - СЃРїСЂР°С€РёРІР°РµРј РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ
         if len(selected_rows) > 1:
-            reply = QMessageBox.question(self, "Подтверждение",
-                f"Будет выполнена авторизация {len(selected_rows)} выбранных аккаунтов.\n\n"
-                f"Каждый аккаунт будет открыт в отдельном браузере.\n"
-                f"Продолжить?",
+            reply = QMessageBox.question(self, "РџРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ",
+                f"Р‘СѓРґРµС‚ РІС‹РїРѕР»РЅРµРЅР° Р°РІС‚РѕСЂРёР·Р°С†РёСЏ {len(selected_rows)} РІС‹Р±СЂР°РЅРЅС‹С… Р°РєРєР°СѓРЅС‚РѕРІ.\n\n"
+                f"РљР°Р¶РґС‹Р№ Р°РєРєР°СѓРЅС‚ Р±СѓРґРµС‚ РѕС‚РєСЂС‹С‚ РІ РѕС‚РґРµР»СЊРЅРѕРј Р±СЂР°СѓР·РµСЂРµ.\n"
+                f"РџСЂРѕРґРѕР»Р¶РёС‚СЊ?",
                 QMessageBox.Yes | QMessageBox.No)
             
             if reply != QMessageBox.Yes:
                 return
         
-        self.log_action(f"Запуск автологина для {len(selected_rows)} выбранных аккаунтов...")
+        self.log_action(f"Р—Р°РїСѓСЃРє Р°РІС‚РѕР»РѕРіРёРЅР° РґР»СЏ {len(selected_rows)} РІС‹Р±СЂР°РЅРЅС‹С… Р°РєРєР°СѓРЅС‚РѕРІ...")
         
-        # Запускаем автологин только для ВЫБРАННЫХ аккаунтов
+        # Р—Р°РїСѓСЃРєР°РµРј Р°РІС‚РѕР»РѕРіРёРЅ С‚РѕР»СЊРєРѕ РґР»СЏ Р’Р«Р‘Р РђРќРќР«РҐ Р°РєРєР°СѓРЅС‚РѕРІ
         self.auto_login_threads = []
         for idx, row_idx in enumerate(selected_rows):
             account = self._accounts[row_idx]
-            self.log_action(f"[{idx+1}/{len(selected_rows)}] Запуск автологина для {account.name}...")
+            self.log_action(f"[{idx+1}/{len(selected_rows)}] Р—Р°РїСѓСЃРє Р°РІС‚РѕР»РѕРіРёРЅР° РґР»СЏ {account.name}...")
             
-            # Создаем отдельный поток для каждого аккаунта
+            # РЎРѕР·РґР°РµРј РѕС‚РґРµР»СЊРЅС‹Р№ РїРѕС‚РѕРє РґР»СЏ РєР°Р¶РґРѕРіРѕ Р°РєРєР°СѓРЅС‚Р°
             thread = AutoLoginThread(account)
             thread.status_signal.connect(lambda msg, acc=account.name: self.log_action(f"[{acc}] {msg}"))
             thread.progress_signal.connect(self._update_progress)
             thread.secret_question_signal.connect(self._handle_secret_question)
             thread.finished_signal.connect(lambda success, msg, acc=account.name: self._on_auto_login_finished(success, f"[{acc}] {msg}"))
             
-            # ВАЖНО: Большая задержка между запусками чтобы не вызвать капчу!
-            QTimer.singleShot(idx * 10000, thread.start)  # 10 секунд между запусками!
+            # Р’РђР–РќРћ: Р‘РѕР»СЊС€Р°СЏ Р·Р°РґРµСЂР¶РєР° РјРµР¶РґСѓ Р·Р°РїСѓСЃРєР°РјРё С‡С‚РѕР±С‹ РЅРµ РІС‹Р·РІР°С‚СЊ РєР°РїС‡Сѓ!
+            QTimer.singleShot(idx * 10000, thread.start)  # 10 СЃРµРєСѓРЅРґ РјРµР¶РґСѓ Р·Р°РїСѓСЃРєР°РјРё!
             self.auto_login_threads.append(thread)
         
-        # Отключаем кнопки на время авторизации
+        # РћС‚РєР»СЋС‡Р°РµРј РєРЅРѕРїРєРё РЅР° РІСЂРµРјСЏ Р°РІС‚РѕСЂРёР·Р°С†РёРё
         self.auto_login_btn.setEnabled(False)
-        self.log_action(f"Запуск автологина для {account.name}...")
+        self.log_action(f"Р—Р°РїСѓСЃРє Р°РІС‚РѕР»РѕРіРёРЅР° РґР»СЏ {account.name}...")
     
     def _handle_secret_question(self, account_name: str, question_text: str):
-        """Обработка секретного вопроса"""
+        """РћР±СЂР°Р±РѕС‚РєР° СЃРµРєСЂРµС‚РЅРѕРіРѕ РІРѕРїСЂРѕСЃР°"""
         from PySide6.QtWidgets import QInputDialog
         
-        # Показываем диалог для ввода ответа
+        # РџРѕРєР°Р·С‹РІР°РµРј РґРёР°Р»РѕРі РґР»СЏ РІРІРѕРґР° РѕС‚РІРµС‚Р°
         answer, ok = QInputDialog.getText(
             self,
-            "Секретный вопрос",
-            f"Аккаунт: {account_name}\n\n{question_text}\n\nВведите ответ:",
+            "РЎРµРєСЂРµС‚РЅС‹Р№ РІРѕРїСЂРѕСЃ",
+            f"РђРєРєР°СѓРЅС‚: {account_name}\n\n{question_text}\n\nР’РІРµРґРёС‚Рµ РѕС‚РІРµС‚:",
             echo=QLineEdit.Normal
         )
         
         if ok and answer:
-            # Передаем ответ в поток
+            # РџРµСЂРµРґР°РµРј РѕС‚РІРµС‚ РІ РїРѕС‚РѕРє
             if hasattr(self, 'auto_login_thread'):
                 self.auto_login_thread.set_secret_answer(answer)
     
     def _update_progress(self, value: int):
-        """Обновление прогресса"""
-        # Если есть прогресс-бар, обновляем его
+        """РћР±РЅРѕРІР»РµРЅРёРµ РїСЂРѕРіСЂРµСЃСЃР°"""
+        # Р•СЃР»Рё РµСЃС‚СЊ РїСЂРѕРіСЂРµСЃСЃ-Р±Р°СЂ, РѕР±РЅРѕРІР»СЏРµРј РµРіРѕ
         if hasattr(self, 'progress_bar'):
             self.progress_bar.setValue(value)
     
     def _on_auto_login_finished(self, success: bool, message: str):
-        """Обработка завершения автологина"""
-        # Включаем кнопку обратно
+        """РћР±СЂР°Р±РѕС‚РєР° Р·Р°РІРµСЂС€РµРЅРёСЏ Р°РІС‚РѕР»РѕРіРёРЅР°"""
+        # Р’РєР»СЋС‡Р°РµРј РєРЅРѕРїРєСѓ РѕР±СЂР°С‚РЅРѕ
         self.auto_login_btn.setEnabled(True)
         
         if success:
             self.log_action(f"[OK] {message}")
-            # Обновляем таблицу
+            # РћР±РЅРѕРІР»СЏРµРј С‚Р°Р±Р»РёС†Сѓ
             self.refresh()
         else:
             self.log_action(f"[ERROR] {message}")
-            QMessageBox.warning(self, "Ошибка автологина", message)
+            QMessageBox.warning(self, "РћС€РёР±РєР° Р°РІС‚РѕР»РѕРіРёРЅР°", message)
     
     def launch_browsers_cdp(self):
-        """Открыть браузеры для парсинга, учитывая выбранные прокси."""
+        """РћС‚РєСЂС‹С‚СЊ Р±СЂР°СѓР·РµСЂС‹ РґР»СЏ РїР°СЂСЃРёРЅРіР°, СѓС‡РёС‚С‹РІР°СЏ РІС‹Р±СЂР°РЅРЅС‹Рµ РїСЂРѕРєСЃРё."""
         selected_rows = self._selected_rows()
         if not selected_rows:
-            QMessageBox.warning(self, "Внимание", "Выберите аккаунты для запуска")
+            QMessageBox.warning(self, "Р’РЅРёРјР°РЅРёРµ", "Р’С‹Р±РµСЂРёС‚Рµ Р°РєРєР°СѓРЅС‚С‹ РґР»СЏ Р·Р°РїСѓСЃРєР°")
             return
 
         selected_accounts = [
             self._accounts[row] for row in selected_rows if row < len(self._accounts)
         ]
 
-        self.log_action(f"Запуск {len(selected_accounts)} выбранных браузеров для парсинга...")
+        self.log_action(f"Р—Р°РїСѓСЃРє {len(selected_accounts)} РІС‹Р±СЂР°РЅРЅС‹С… Р±СЂР°СѓР·РµСЂРѕРІ РґР»СЏ РїР°СЂСЃРёРЅРіР°...")
 
         reply = QMessageBox.question(
             self,
-            "Запуск браузеров",
-            f"Будет запущено {len(selected_accounts)} браузеров для парсинга.\n\n"
-            f"Аккаунты:\n" + "\n".join(f"  • {acc.name}" for acc in selected_accounts) + "\n\n"
-            "Браузеры откроются с существующими куками без попытки автологина.\n"
-            "Продолжить?",
+            "Р—Р°РїСѓСЃРє Р±СЂР°СѓР·РµСЂРѕРІ",
+            f"Р‘СѓРґРµС‚ Р·Р°РїСѓС‰РµРЅРѕ {len(selected_accounts)} Р±СЂР°СѓР·РµСЂРѕРІ РґР»СЏ РїР°СЂСЃРёРЅРіР°.\n\n"
+            f"РђРєРєР°СѓРЅС‚С‹:\n" + "\n".join(f"  вЂў {acc.name}" for acc in selected_accounts) + "\n\n"
+            "Р‘СЂР°СѓР·РµСЂС‹ РѕС‚РєСЂРѕСЋС‚СЃСЏ СЃ СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёРјРё РєСѓРєР°РјРё Р±РµР· РїРѕРїС‹С‚РєРё Р°РІС‚РѕР»РѕРіРёРЅР°.\n"
+            "РџСЂРѕРґРѕР»Р¶РёС‚СЊ?",
         )
 
         if reply != QMessageBox.Yes:
@@ -1274,15 +1343,15 @@ class AccountsTabExtended(QWidget):
         if launched:
             QMessageBox.information(
                 self,
-                "Успех",
-                f"Запущено {launched} браузеров. Теперь можно запускать парсер.",
+                "РЈСЃРїРµС…",
+                f"Р—Р°РїСѓС‰РµРЅРѕ {launched} Р±СЂР°СѓР·РµСЂРѕРІ. РўРµРїРµСЂСЊ РјРѕР¶РЅРѕ Р·Р°РїСѓСЃРєР°С‚СЊ РїР°СЂСЃРµСЂ.",
             )
         else:
-            self.log_action("❌ Не удалось запустить браузеры")
-            QMessageBox.warning(self, "Ошибка", "Не удалось запустить браузеры")
+            self.log_action("вќЊ РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РїСѓСЃС‚РёС‚СЊ Р±СЂР°СѓР·РµСЂС‹")
+            QMessageBox.warning(self, "РћС€РёР±РєР°", "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РїСѓСЃС‚РёС‚СЊ Р±СЂР°СѓР·РµСЂС‹")
 
     def _launch_browser_handle(self, account, *, target_url: str, prefer_cdp: bool):
-        """Запустить браузер через BrowserFactory и вернуть handle."""
+        """Р—Р°РїСѓСЃС‚РёС‚СЊ Р±СЂР°СѓР·РµСЂ С‡РµСЂРµР· BrowserFactory Рё РІРµСЂРЅСѓС‚СЊ handle."""
         try:
             handle = start_for_account(
                 account_id=account.id,
@@ -1291,7 +1360,7 @@ class AccountsTabExtended(QWidget):
                 profile_override=account.profile_path or f".profiles/{account.name}",
             )
         except Exception as exc:
-            self.log_action(f"[{account.name}] ❌ Ошибка запуска браузера: {exc}")
+            self.log_action(f"[{account.name}] вќЊ РћС€РёР±РєР° Р·Р°РїСѓСЃРєР° Р±СЂР°СѓР·РµСЂР°: {exc}")
             return None
 
         self._browser_handles.append(handle)
@@ -1304,7 +1373,7 @@ class AccountsTabExtended(QWidget):
         if handle.kind == "cdp":
             port = metadata.get("cdp_port") if isinstance(metadata, dict) else None
             if port:
-                self.log_action(f"[{account.name}] CDP порт: {port}")
+                self.log_action(f"[{account.name}] CDP РїРѕСЂС‚: {port}")
 
         preflight = metadata.get("preflight") if isinstance(metadata, dict) else None
         if isinstance(preflight, dict):
@@ -1317,12 +1386,12 @@ class AccountsTabExtended(QWidget):
             else:
                 self.log_action(f"[{account.name}] Proxy preflight failed: {preflight.get('error')}")
 
-        # Открываем целевой URL
+        # РћС‚РєСЂС‹РІР°РµРј С†РµР»РµРІРѕР№ URL
         try:
             if handle.page:
                 handle.page.goto(target_url, wait_until="domcontentloaded")
         except Exception as exc:
-            self.log_action(f"[{account.name}] ⚠️ Не удалось открыть {target_url}: {exc}")
+            self.log_action(f"[{account.name}] вљ пёЏ РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ {target_url}: {exc}")
 
         self._log_proxy_ip(account.name, handle)
         return handle
@@ -1336,11 +1405,11 @@ class AccountsTabExtended(QWidget):
             )
             ip_value = ip_info.get("ip") if isinstance(ip_info, dict) else ip_info
             if ip_value:
-                self.log_action(f"[{account_name}] IP через прокси: {ip_value}")
+                self.log_action(f"[{account_name}] IP С‡РµСЂРµР· РїСЂРѕРєСЃРё: {ip_value}")
             else:
-                self.log_action(f"[{account_name}] Не удалось получить IP (пустой ответ)")
+                self.log_action(f"[{account_name}] РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ IP (РїСѓСЃС‚РѕР№ РѕС‚РІРµС‚)")
         except Exception as exc:
-            self.log_action(f"[{account_name}] ⚠️ Ошибка проверки IP: {exc}")
+            self.log_action(f"[{account_name}] вљ пёЏ РћС€РёР±РєР° РїСЂРѕРІРµСЂРєРё IP: {exc}")
 
     def _release_browser_handles(self) -> None:
         if not self._browser_handles:
@@ -1353,154 +1422,156 @@ class AccountsTabExtended(QWidget):
         self._browser_handles.clear()
     
     def login_all(self):
-        """Автологин для новых аккаунтов - последовательная авторизация"""
+        """РђРІС‚РѕР»РѕРіРёРЅ РґР»СЏ РЅРѕРІС‹С… Р°РєРєР°СѓРЅС‚РѕРІ - РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅР°СЏ Р°РІС‚РѕСЂРёР·Р°С†РёСЏ"""
         if not self._accounts:
-            QMessageBox.warning(self, "Внимание", "Нет аккаунтов для логина")
+            QMessageBox.warning(self, "Р’РЅРёРјР°РЅРёРµ", "РќРµС‚ Р°РєРєР°СѓРЅС‚РѕРІ РґР»СЏ Р»РѕРіРёРЅР°")
             return
         
-        self.log_action("Запуск последовательной авторизации всех аккаунтов...")
+        self.log_action("Р—Р°РїСѓСЃРє РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕР№ Р°РІС‚РѕСЂРёР·Р°С†РёРё РІСЃРµС… Р°РєРєР°СѓРЅС‚РѕРІ...")
         
-        # Спрашиваем подтверждение
-        reply = QMessageBox.question(self, "Подтверждение",
-            f"Будет выполнен последовательный вход в {len(self._accounts)} аккаунт(ов).\n\n"
-            f"Каждый аккаунт будет авторизован автоматически.\n"
-            f"Это может занять несколько минут.\n\n"
-            f"Продолжить?")
+        # РЎРїСЂР°С€РёРІР°РµРј РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ
+        reply = QMessageBox.question(self, "РџРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ",
+            f"Р‘СѓРґРµС‚ РІС‹РїРѕР»РЅРµРЅ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅС‹Р№ РІС…РѕРґ РІ {len(self._accounts)} Р°РєРєР°СѓРЅС‚(РѕРІ).\n\n"
+            f"РљР°Р¶РґС‹Р№ Р°РєРєР°СѓРЅС‚ Р±СѓРґРµС‚ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё.\n"
+            f"Р­С‚Рѕ РјРѕР¶РµС‚ Р·Р°РЅСЏС‚СЊ РЅРµСЃРєРѕР»СЊРєРѕ РјРёРЅСѓС‚.\n\n"
+            f"РџСЂРѕРґРѕР»Р¶РёС‚СЊ?")
         
         if reply == QMessageBox.Yes:
-            self.log_action("Начинаем последовательную авторизацию...")
-            # Запускаем последовательную авторизацию
+            self.log_action("РќР°С‡РёРЅР°РµРј РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅСѓСЋ Р°РІС‚РѕСЂРёР·Р°С†РёСЋ...")
+            # Р—Р°РїСѓСЃРєР°РµРј РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅСѓСЋ Р°РІС‚РѕСЂРёР·Р°С†РёСЋ
             self._current_login_index = 0
             self._login_next_account()
     
     def _login_next_account(self):
-        """Логин в следующий аккаунт из списка"""
+        """Р›РѕРіРёРЅ РІ СЃР»РµРґСѓСЋС‰РёР№ Р°РєРєР°СѓРЅС‚ РёР· СЃРїРёСЃРєР°"""
         if self._current_login_index >= len(self._accounts):
-            # Все аккаунты обработаны
-            self.log_action("✅ Авторизация всех аккаунтов завершена!")
-            QMessageBox.information(self, "Готово", "Авторизация всех аккаунтов завершена!")
+            # Р’СЃРµ Р°РєРєР°СѓРЅС‚С‹ РѕР±СЂР°Р±РѕС‚Р°РЅС‹
+            self.log_action("вњ… РђРІС‚РѕСЂРёР·Р°С†РёСЏ РІСЃРµС… Р°РєРєР°СѓРЅС‚РѕРІ Р·Р°РІРµСЂС€РµРЅР°!")
+            QMessageBox.information(self, "Р“РѕС‚РѕРІРѕ", "РђРІС‚РѕСЂРёР·Р°С†РёСЏ РІСЃРµС… Р°РєРєР°СѓРЅС‚РѕРІ Р·Р°РІРµСЂС€РµРЅР°!")
             self.refresh()
             return
         
         account = self._accounts[self._current_login_index]
-        self.log_action(f"Авторизация {self._current_login_index + 1}/{len(self._accounts)}: {account.name}...")
+        self.log_action(f"РђРІС‚РѕСЂРёР·Р°С†РёСЏ {self._current_login_index + 1}/{len(self._accounts)}: {account.name}...")
         
-        # Запускаем автологин для текущего аккаунта
+        # Р—Р°РїСѓСЃРєР°РµРј Р°РІС‚РѕР»РѕРіРёРЅ РґР»СЏ С‚РµРєСѓС‰РµРіРѕ Р°РєРєР°СѓРЅС‚Р°
         self.auto_login_thread = AutoLoginThread(account)
         self.auto_login_thread.status_signal.connect(lambda msg: self.log_action(f"[{account.name}] {msg}"))
         self.auto_login_thread.finished_signal.connect(self._on_account_login_finished)
         self.auto_login_thread.start()
     
     def _on_account_login_finished(self, success: bool, message: str):
-        """Обработка завершения логина одного аккаунта"""
+        """РћР±СЂР°Р±РѕС‚РєР° Р·Р°РІРµСЂС€РµРЅРёСЏ Р»РѕРіРёРЅР° РѕРґРЅРѕРіРѕ Р°РєРєР°СѓРЅС‚Р°"""
         account = self._accounts[self._current_login_index]
         
         if success:
-            self.log_action(f"✅ {account.name}: {message}")
+            self.log_action(f"вњ… {account.name}: {message}")
         else:
-            self.log_action(f"❌ {account.name}: {message}")
+            self.log_action(f"вќЊ {account.name}: {message}")
         
-        # Переходим к следующему аккаунту
+        # РџРµСЂРµС…РѕРґРёРј Рє СЃР»РµРґСѓСЋС‰РµРјСѓ Р°РєРєР°СѓРЅС‚Сѓ
         self._current_login_index += 1
         
-        # Небольшая задержка перед следующим аккаунтом
+        # РќРµР±РѕР»СЊС€Р°СЏ Р·Р°РґРµСЂР¶РєР° РїРµСЂРµРґ СЃР»РµРґСѓСЋС‰РёРј Р°РєРєР°СѓРЅС‚РѕРј
         QTimer.singleShot(2000, self._login_next_account)
     
     def _start_login(self, accounts, headless=False, visual_mode=False):
-        """Запустить процесс логина"""
+        """Р—Р°РїСѓСЃС‚РёС‚СЊ РїСЂРѕС†РµСЃСЃ Р»РѕРіРёРЅР°"""
         if self.login_thread and self.login_thread.isRunning():
-            QMessageBox.warning(self, "Внимание", "Процесс логина уже запущен")
+            QMessageBox.warning(self, "Р’РЅРёРјР°РЅРёРµ", "РџСЂРѕС†РµСЃСЃ Р»РѕРіРёРЅР° СѓР¶Рµ Р·Р°РїСѓС‰РµРЅ")
             return
         
-        # Блокируем кнопки
+        # Р‘Р»РѕРєРёСЂСѓРµРј РєРЅРѕРїРєРё
         self.login_btn.setEnabled(False)
         self.login_all_btn.setEnabled(False)
         
-        # Показываем прогресс
+        # РџРѕРєР°Р·С‹РІР°РµРј РїСЂРѕРіСЂРµСЃСЃ
         self.login_progress.setVisible(True)
-        self.login_progress.setRange(0, 0)  # Неопределенный прогресс
+        self.login_progress.setRange(0, 0)  # РќРµРѕРїСЂРµРґРµР»РµРЅРЅС‹Р№ РїСЂРѕРіСЂРµСЃСЃ
         
-        # Создаем и запускаем поток
-        # visual_mode=True для визуального парсинга
+        # РЎРѕР·РґР°РµРј Рё Р·Р°РїСѓСЃРєР°РµРј РїРѕС‚РѕРє
+        # visual_mode=True РґР»СЏ РІРёР·СѓР°Р»СЊРЅРѕРіРѕ РїР°СЂСЃРёРЅРіР°
         self.login_thread = LoginWorkerThread(accounts, check_only=headless, visual_mode=visual_mode)
         self.login_thread.progress_signal.connect(self.on_login_progress)
         self.login_thread.account_logged_signal.connect(self.on_account_logged)
         self.login_thread.finished_signal.connect(self.on_login_finished)
         self.login_thread.start()
         
-        self.log_action(f"Запуск {len(accounts)} браузеров...")
+        self.log_action(f"Р—Р°РїСѓСЃРє {len(accounts)} Р±СЂР°СѓР·РµСЂРѕРІ...")
     
     def on_login_progress(self, message):
-        """Обработка прогресса логина"""
+        """РћР±СЂР°Р±РѕС‚РєР° РїСЂРѕРіСЂРµСЃСЃР° Р»РѕРіРёРЅР°"""
         self.log_action(message)
     
     def on_account_logged(self, account_id, success, message):
-        """Обработка логина конкретного аккаунта"""
-        # Обновляем статус в БД
+        """РћР±СЂР°Р±РѕС‚РєР° Р»РѕРіРёРЅР° РєРѕРЅРєСЂРµС‚РЅРѕРіРѕ Р°РєРєР°СѓРЅС‚Р°"""
+        # РћР±РЅРѕРІР»СЏРµРј СЃС‚Р°С‚СѓСЃ РІ Р‘Р”
         if success:
             account_service.mark_ok(account_id)
         
-        # Обновляем таблицу
+        # РћР±РЅРѕРІР»СЏРµРј С‚Р°Р±Р»РёС†Сѓ
         self.refresh()
     
     def on_login_finished(self, success, message):
-        """Обработка завершения логина"""
+        """РћР±СЂР°Р±РѕС‚РєР° Р·Р°РІРµСЂС€РµРЅРёСЏ Р»РѕРіРёРЅР°"""
         self.login_progress.setVisible(False)
         self.login_btn.setEnabled(True)
         self.login_all_btn.setEnabled(True)
         
         if success:
-            QMessageBox.information(self, "Успех", message)
+            QMessageBox.information(self, "РЈСЃРїРµС…", message)
         else:
-            QMessageBox.warning(self, "Внимание", message)
+            QMessageBox.warning(self, "Р’РЅРёРјР°РЅРёРµ", message)
         
-        self.log_action("Готов к работе")
+        self.log_action("Р“РѕС‚РѕРІ Рє СЂР°Р±РѕС‚Рµ")
         self.refresh()
     
     def open_browsers_for_login(self):
-        """Открыть браузеры только для тех аккаунтов где нужен логин"""
+        """РћС‚РєСЂС‹С‚СЊ Р±СЂР°СѓР·РµСЂС‹ С‚РѕР»СЊРєРѕ РґР»СЏ С‚РµС… Р°РєРєР°СѓРЅС‚РѕРІ РіРґРµ РЅСѓР¶РµРЅ Р»РѕРіРёРЅ"""
         from pathlib import Path
         
-        # Фильтруем аккаунты которые требуют логина
+        # Р¤РёР»СЊС‚СЂСѓРµРј Р°РєРєР°СѓРЅС‚С‹ РєРѕС‚РѕСЂС‹Рµ С‚СЂРµР±СѓСЋС‚ Р»РѕРіРёРЅР°
         accounts_to_check = []
         for acc in self._accounts:
-            if acc.name != "demo_account":  # Пропускаем демо
-                # Используем полный путь к профилю
-                # acc.profile_path может содержать относительный путь типа ".profiles/dsmismirnov"
+            if acc.name != "demo_account":  # РџСЂРѕРїСѓСЃРєР°РµРј РґРµРјРѕ
+                # РСЃРїРѕР»СЊР·СѓРµРј РїРѕР»РЅС‹Р№ РїСѓС‚СЊ Рє РїСЂРѕС„РёР»СЋ
+                # acc.profile_path РјРѕР¶РµС‚ СЃРѕРґРµСЂР¶Р°С‚СЊ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ С‚РёРїР° ".profiles/dsmismirnov"
                 if acc.profile_path:
-                    # Если путь начинается с .profiles - это относительный путь
+                    # Р•СЃР»Рё РїСѓС‚СЊ РЅР°С‡РёРЅР°РµС‚СЃСЏ СЃ .profiles - СЌС‚Рѕ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ
                     if acc.profile_path.startswith(".profiles"):
                         profile_full_path = Path("C:/AI/yandex") / acc.profile_path
                     else:
                         profile_full_path = Path(acc.profile_path)
                 else:
-                    # Если путь не задан, используем стандартный
+                    # Р•СЃР»Рё РїСѓС‚СЊ РЅРµ Р·Р°РґР°РЅ, РёСЃРїРѕР»СЊР·СѓРµРј СЃС‚Р°РЅРґР°СЂС‚РЅС‹Р№
                     profile_full_path = Path("C:/AI/yandex/.profiles") / acc.name
                 
-                # Проверяем есть ли сохраненные куки
+                # РџСЂРѕРІРµСЂСЏРµРј РµСЃС‚СЊ Р»Рё СЃРѕС…СЂР°РЅРµРЅРЅС‹Рµ РєСѓРєРё
                 cookie_file = profile_full_path / "Default" / "Cookies"
                 
-                # Добавляем в список для проверки
+                # Р”РѕР±Р°РІР»СЏРµРј РІ СЃРїРёСЃРѕРє РґР»СЏ РїСЂРѕРІРµСЂРєРё
+                _, proxy_uri, proxy_id = self._build_proxy_payload(acc)
                 accounts_to_check.append({
                     "account": acc,
                     "has_cookies": cookie_file.exists(),
                     "profile_path": str(profile_full_path),
-                    "proxy": getattr(acc, "proxy", None),
+                    "proxy": proxy_uri or getattr(acc, "proxy", None),
+                    "proxy_id": proxy_id,
                 })
         
         if not accounts_to_check:
-            QMessageBox.information(self, "Информация", "Нет аккаунтов для проверки")
+            QMessageBox.information(self, "РРЅС„РѕСЂРјР°С†РёСЏ", "РќРµС‚ Р°РєРєР°СѓРЅС‚РѕРІ РґР»СЏ РїСЂРѕРІРµСЂРєРё")
             return
         
-        # Показываем диалог выбора
-        msg = "Статус аккаунтов:\n\n"
+        # РџРѕРєР°Р·С‹РІР°РµРј РґРёР°Р»РѕРі РІС‹Р±РѕСЂР°
+        msg = "РЎС‚Р°С‚СѓСЃ Р°РєРєР°СѓРЅС‚РѕРІ:\n\n"
         
-        # Даже если все авторизованы, открываем браузеры для визуального парсинга
-        msg += "\n⚠️ ВНИМАНИЕ: Браузеры будут открыты для визуального парсинга.\n"
-        msg += "Все аккаунты должны быть авторизованы.\n"
-        msg += "Открыть браузеры?"
+        # Р”Р°Р¶Рµ РµСЃР»Рё РІСЃРµ Р°РІС‚РѕСЂРёР·РѕРІР°РЅС‹, РѕС‚РєСЂС‹РІР°РµРј Р±СЂР°СѓР·РµСЂС‹ РґР»СЏ РІРёР·СѓР°Р»СЊРЅРѕРіРѕ РїР°СЂСЃРёРЅРіР°
+        msg += "\nвљ пёЏ Р’РќРРњРђРќРР•: Р‘СЂР°СѓР·РµСЂС‹ Р±СѓРґСѓС‚ РѕС‚РєСЂС‹С‚С‹ РґР»СЏ РІРёР·СѓР°Р»СЊРЅРѕРіРѕ РїР°СЂСЃРёРЅРіР°.\n"
+        msg += "Р’СЃРµ Р°РєРєР°СѓРЅС‚С‹ РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ Р°РІС‚РѕСЂРёР·РѕРІР°РЅС‹.\n"
+        msg += "РћС‚РєСЂС‹С‚СЊ Р±СЂР°СѓР·РµСЂС‹?"
         
-        reply = QMessageBox.question(self, "Открыть браузеры для логина", msg)
+        reply = QMessageBox.question(self, "РћС‚РєСЂС‹С‚СЊ Р±СЂР°СѓР·РµСЂС‹ РґР»СЏ Р»РѕРіРёРЅР°", msg)
         if reply != QMessageBox.Yes:
             return
 
@@ -1520,44 +1591,44 @@ class AccountsTabExtended(QWidget):
         if launched:
             QMessageBox.information(
                 self,
-                "Готово",
-                f"Открыто {launched} браузеров. Войдите вручную и обновите статусы.",
+                "Р“РѕС‚РѕРІРѕ",
+                f"РћС‚РєСЂС‹С‚Рѕ {launched} Р±СЂР°СѓР·РµСЂРѕРІ. Р’РѕР№РґРёС‚Рµ РІСЂСѓС‡РЅСѓСЋ Рё РѕР±РЅРѕРІРёС‚Рµ СЃС‚Р°С‚СѓСЃС‹.",
             )
         else:
             QMessageBox.warning(
                 self,
-                "Ошибка",
-                "Не удалось открыть браузеры для визуального парсинга.",
+                "РћС€РёР±РєР°",
+                "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ Р±СЂР°СѓР·РµСЂС‹ РґР»СЏ РІРёР·СѓР°Р»СЊРЅРѕРіРѕ РїР°СЂСЃРёРЅРіР°.",
             )
     
     def show_browser_status(self):
-        """Показать статус браузеров"""
+        """РџРѕРєР°Р·Р°С‚СЊ СЃС‚Р°С‚СѓСЃ Р±СЂР°СѓР·РµСЂРѕРІ"""
         if hasattr(self, 'browser_manager') and self.browser_manager:
             self.browser_manager.show_status()
         else:
-            QMessageBox.information(self, "Статус", "Браузеры не запущены")
+            QMessageBox.information(self, "РЎС‚Р°С‚СѓСЃ", "Р‘СЂР°СѓР·РµСЂС‹ РЅРµ Р·Р°РїСѓС‰РµРЅС‹")
     
     def update_browser_status(self):
-        """Обновить статусы залогинены ли браузеры"""
+        """РћР±РЅРѕРІРёС‚СЊ СЃС‚Р°С‚СѓСЃС‹ Р·Р°Р»РѕРіРёРЅРµРЅС‹ Р»Рё Р±СЂР°СѓР·РµСЂС‹"""
         if hasattr(self, 'browser_manager') and self.browser_manager:
-            QMessageBox.information(self, "Статус", "Проверка статусов...")
-            # TODO: реализовать проверку через browser_manager
+            QMessageBox.information(self, "РЎС‚Р°С‚СѓСЃ", "РџСЂРѕРІРµСЂРєР° СЃС‚Р°С‚СѓСЃРѕРІ...")
+            # TODO: СЂРµР°Р»РёР·РѕРІР°С‚СЊ РїСЂРѕРІРµСЂРєСѓ С‡РµСЂРµР· browser_manager
         else:
-            QMessageBox.warning(self, "Внимание", "Браузеры не запущены")
+            QMessageBox.warning(self, "Р’РЅРёРјР°РЅРёРµ", "Р‘СЂР°СѓР·РµСЂС‹ РЅРµ Р·Р°РїСѓС‰РµРЅС‹")
     
     def minimize_all_browsers(self):
-        """Минимизировать все браузеры"""
+        """РњРёРЅРёРјРёР·РёСЂРѕРІР°С‚СЊ РІСЃРµ Р±СЂР°СѓР·РµСЂС‹"""
         if hasattr(self, 'browser_manager') and self.browser_manager:
             try:
-                # TODO: реализовать минимизацию в browser_manager
-                QMessageBox.information(self, "Готово", "Функция в разработке")
+                # TODO: СЂРµР°Р»РёР·РѕРІР°С‚СЊ РјРёРЅРёРјРёР·Р°С†РёСЋ РІ browser_manager
+                QMessageBox.information(self, "Р“РѕС‚РѕРІРѕ", "Р¤СѓРЅРєС†РёСЏ РІ СЂР°Р·СЂР°Р±РѕС‚РєРµ")
             except Exception as e:
-                QMessageBox.warning(self, "Ошибка", str(e))
+                QMessageBox.warning(self, "РћС€РёР±РєР°", str(e))
         else:
-            QMessageBox.warning(self, "Внимание", "Браузеры не запущены")
+            QMessageBox.warning(self, "Р’РЅРёРјР°РЅРёРµ", "Р‘СЂР°СѓР·РµСЂС‹ РЅРµ Р·Р°РїСѓС‰РµРЅС‹")
     
     def close_all_browsers(self):
-        """Закрыть все открытые браузеры (и через BrowserFactory, и через VisualBrowserManager)."""
+        """Р—Р°РєСЂС‹С‚СЊ РІСЃРµ РѕС‚РєСЂС‹С‚С‹Рµ Р±СЂР°СѓР·РµСЂС‹ (Рё С‡РµСЂРµР· BrowserFactory, Рё С‡РµСЂРµР· VisualBrowserManager)."""
         closed = False
 
         if self._browser_handles:
@@ -1572,8 +1643,8 @@ class AccountsTabExtended(QWidget):
         if hasattr(self, 'browser_manager') and self.browser_manager:
             reply = QMessageBox.question(
                 self,
-                "Подтверждение",
-                "Закрыть все браузеры?",
+                "РџРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ",
+                "Р—Р°РєСЂС‹С‚СЊ РІСЃРµ Р±СЂР°СѓР·РµСЂС‹?",
                 QMessageBox.Yes | QMessageBox.No,
             )
 
@@ -1584,88 +1655,88 @@ class AccountsTabExtended(QWidget):
                     asyncio.set_event_loop(loop)
                     loop.run_until_complete(self.browser_manager.close_all())
                     self.browser_manager = None
-                    QMessageBox.information(self, "Готово", "Браузеры закрыты")
+                    QMessageBox.information(self, "Р“РѕС‚РѕРІРѕ", "Р‘СЂР°СѓР·РµСЂС‹ Р·Р°РєСЂС‹С‚С‹")
                     closed = True
                 except Exception as e:
-                    QMessageBox.warning(self, "Ошибка", f"Ошибка при закрытии: {e}")
+                    QMessageBox.warning(self, "РћС€РёР±РєР°", f"РћС€РёР±РєР° РїСЂРё Р·Р°РєСЂС‹С‚РёРё: {e}")
 
         if not closed:
-            QMessageBox.information(self, "Информация", "Браузеры не запущены")
+            QMessageBox.information(self, "РРЅС„РѕСЂРјР°С†РёСЏ", "Р‘СЂР°СѓР·РµСЂС‹ РЅРµ Р·Р°РїСѓС‰РµРЅС‹")
     
     def on_table_double_click(self, item):
-        """Обработчик двойного клика по ячейке таблицы"""
+        """РћР±СЂР°Р±РѕС‚С‡РёРє РґРІРѕР№РЅРѕРіРѕ РєР»РёРєР° РїРѕ СЏС‡РµР№РєРµ С‚Р°Р±Р»РёС†С‹"""
         column = self.table.currentColumn()
         
-        # Если клик по колонке "Куки" (индекс 7)
+        # Р•СЃР»Рё РєР»РёРє РїРѕ РєРѕР»РѕРЅРєРµ "РљСѓРєРё" (РёРЅРґРµРєСЃ 7)
         if column == 7:
             self.edit_cookies()
         else:
             self.edit_account()
     
     def edit_cookies(self, row):
-        """Редактировать куки для аккаунта"""
+        """Р РµРґР°РєС‚РёСЂРѕРІР°С‚СЊ РєСѓРєРё РґР»СЏ Р°РєРєР°СѓРЅС‚Р°"""
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QDialogButtonBox, QLabel
 
         account = self._accounts[row]
         profile_path_str = self._normalize_profile_path(account.profile_path, account.name)
         profile_path = Path(profile_path_str)
         
-        # Создаем диалог
+        # РЎРѕР·РґР°РµРј РґРёР°Р»РѕРі
         dialog = QDialog(self)
-        dialog.setWindowTitle("Управление куками Wordstat")
+        dialog.setWindowTitle("РЈРїСЂР°РІР»РµРЅРёРµ РєСѓРєР°РјРё Wordstat")
         dialog.setMinimumSize(600, 400)
         
         layout = QVBoxLayout(dialog)
         
-        # Информация
+        # РРЅС„РѕСЂРјР°С†РёСЏ
         info = QLabel(f"""
-<b>Важные куки для Wordstat:</b><br>
-• sessionid2 - основная сессия<br>
-• yandex_login - логин пользователя<br>
-• yandexuid - ID пользователя<br>
-• L - токен авторизации<br>
+<b>Р’Р°Р¶РЅС‹Рµ РєСѓРєРё РґР»СЏ Wordstat:</b><br>
+вЂў sessionid2 - РѕСЃРЅРѕРІРЅР°СЏ СЃРµСЃСЃРёСЏ<br>
+вЂў yandex_login - Р»РѕРіРёРЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ<br>
+вЂў yandexuid - ID РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ<br>
+вЂў L - С‚РѕРєРµРЅ Р°РІС‚РѕСЂРёР·Р°С†РёРё<br>
 <br>
-<b>Профиль:</b> {account.name}<br>
-<b>Путь:</b> {profile_path_str}
+<b>РџСЂРѕС„РёР»СЊ:</b> {account.name}<br>
+<b>РџСѓС‚СЊ:</b> {profile_path_str}
         """)
         layout.addWidget(info)
         
-        # Поле для ввода куков
+        # РџРѕР»Рµ РґР»СЏ РІРІРѕРґР° РєСѓРєРѕРІ
         cookies_edit = QTextEdit()
         cookies_edit.setPlaceholderText(
-            "Вставьте куки в формате:\n"
+            "Р’СЃС‚Р°РІСЊС‚Рµ РєСѓРєРё РІ С„РѕСЂРјР°С‚Рµ:\n"
             "sessionid2=value1; yandex_login=value2; L=value3"
         )
         
-        # Пытаемся прочитать текущие куки (упрощенно)
+        # РџС‹С‚Р°РµРјСЃСЏ РїСЂРѕС‡РёС‚Р°С‚СЊ С‚РµРєСѓС‰РёРµ РєСѓРєРё (СѓРїСЂРѕС‰РµРЅРЅРѕ)
         cookies_file = profile_path / "Default" / "Cookies"
         if cookies_file.exists():
-            cookies_edit.setPlainText(f"Файл куков существует: {cookies_file}\nРазмер: {cookies_file.stat().st_size} bytes\n\n[Для редактирования куков используйте браузер]")
+            cookies_edit.setPlainText(f"Р¤Р°Р№Р» РєСѓРєРѕРІ СЃСѓС‰РµСЃС‚РІСѓРµС‚: {cookies_file}\nР Р°Р·РјРµСЂ: {cookies_file.stat().st_size} bytes\n\n[Р”Р»СЏ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ РєСѓРєРѕРІ РёСЃРїРѕР»СЊР·СѓР№С‚Рµ Р±СЂР°СѓР·РµСЂ]")
         
         layout.addWidget(cookies_edit)
         
-        # Кнопки
+        # РљРЅРѕРїРєРё
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
         
         if dialog.exec() == QDialog.Accepted:
-            # Здесь можно добавить логику сохранения куков
-            # Но безопаснее логиниться через браузер
-            QMessageBox.information(self, "Информация", 
-                "Для изменения куков откройте браузер с этим профилем,\n"
-                "войдите в Яндекс вручную или используйте кнопку 'Автологин'.")
+            # Р—РґРµСЃСЊ РјРѕР¶РЅРѕ РґРѕР±Р°РІРёС‚СЊ Р»РѕРіРёРєСѓ СЃРѕС…СЂР°РЅРµРЅРёСЏ РєСѓРєРѕРІ
+            # РќРѕ Р±РµР·РѕРїР°СЃРЅРµРµ Р»РѕРіРёРЅРёС‚СЊСЃСЏ С‡РµСЂРµР· Р±СЂР°СѓР·РµСЂ
+            QMessageBox.information(self, "РРЅС„РѕСЂРјР°С†РёСЏ", 
+                "Р”Р»СЏ РёР·РјРµРЅРµРЅРёСЏ РєСѓРєРѕРІ РѕС‚РєСЂРѕР№С‚Рµ Р±СЂР°СѓР·РµСЂ СЃ СЌС‚РёРј РїСЂРѕС„РёР»РµРј,\n"
+                "РІРѕР№РґРёС‚Рµ РІ РЇРЅРґРµРєСЃ РІСЂСѓС‡РЅСѓСЋ РёР»Рё РёСЃРїРѕР»СЊР·СѓР№С‚Рµ РєРЅРѕРїРєСѓ 'РђРІС‚РѕР»РѕРіРёРЅ'.")
 
     def _update_profile(self, account_id, profile_key, account_name: Optional[str] = None):
-        """Обновить профиль для аккаунта"""
+        """РћР±РЅРѕРІРёС‚СЊ РїСЂРѕС„РёР»СЊ РґР»СЏ Р°РєРєР°СѓРЅС‚Р°"""
         normalized_name = account_name if account_name else ""
         profile_path = self._normalize_profile_path(profile_key, normalized_name)
         account_service.update_account(account_id, profile_path=profile_path)
-        print(f"[Accounts] Профиль для аккаунта {account_id} изменён на {profile_path}")
+        print(f"[Accounts] РџСЂРѕС„РёР»СЊ РґР»СЏ Р°РєРєР°СѓРЅС‚Р° {account_id} РёР·РјРµРЅС‘РЅ РЅР° {profile_path}")
 
     def _handle_item_changed(self, item):
-        """Отслеживаем изменение профиля через делегат."""
+        """РћС‚СЃР»РµР¶РёРІР°РµРј РёР·РјРµРЅРµРЅРёРµ РїСЂРѕС„РёР»СЏ С‡РµСЂРµР· РґРµР»РµРіР°С‚."""
         if item.column() != PROFILE_SELECT_COLUMN or not self._accounts:
             return
         row = item.row()
@@ -1685,13 +1756,13 @@ class AccountsTabExtended(QWidget):
         self._update_profile(account.id, normalized_path, account.name)
         
     def on_table_double_click(self, row, col):
-        """Обработка двойного клика по таблице"""
-        # Если кликнули по колонке куков - открываем диалог редактирования
-        if col == 8:  # Колонка куков
+        """РћР±СЂР°Р±РѕС‚РєР° РґРІРѕР№РЅРѕРіРѕ РєР»РёРєР° РїРѕ С‚Р°Р±Р»РёС†Рµ"""
+        # Р•СЃР»Рё РєР»РёРєРЅСѓР»Рё РїРѕ РєРѕР»РѕРЅРєРµ РєСѓРєРѕРІ - РѕС‚РєСЂС‹РІР°РµРј РґРёР°Р»РѕРі СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ
+        if col == 8:  # РљРѕР»РѕРЅРєР° РєСѓРєРѕРІ
             self.edit_cookies(row)
             
     def edit_cookies(self, row):
-        """Редактировать куки для аккаунта"""
+        """Р РµРґР°РєС‚РёСЂРѕРІР°С‚СЊ РєСѓРєРё РґР»СЏ Р°РєРєР°СѓРЅС‚Р°"""
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QDialogButtonBox, QLabel
 
         account = self._accounts[row]
@@ -1699,35 +1770,35 @@ class AccountsTabExtended(QWidget):
         profile_path = Path(profile_path_str)
 
         dialog = QDialog(self)
-        dialog.setWindowTitle("Управление куками Wordstat")
+        dialog.setWindowTitle("РЈРїСЂР°РІР»РµРЅРёРµ РєСѓРєР°РјРё Wordstat")
         dialog.setMinimumSize(600, 400)
 
         layout = QVBoxLayout(dialog)
 
         info = QLabel(f"""
-<b>Важные куки для Wordstat:</b><br>
-• sessionid2 - основная сессия<br>
-• yandex_login - логин пользователя<br>
-• yandexuid - ID пользователя<br>
-• L - токен авторизации<br>
+<b>Р’Р°Р¶РЅС‹Рµ РєСѓРєРё РґР»СЏ Wordstat:</b><br>
+вЂў sessionid2 - РѕСЃРЅРѕРІРЅР°СЏ СЃРµСЃСЃРёСЏ<br>
+вЂў yandex_login - Р»РѕРіРёРЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ<br>
+вЂў yandexuid - ID РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ<br>
+вЂў L - С‚РѕРєРµРЅ Р°РІС‚РѕСЂРёР·Р°С†РёРё<br>
 <br>
-<b>Профиль:</b> {account.name}<br>
-<b>Путь:</b> {profile_path_str}
+<b>РџСЂРѕС„РёР»СЊ:</b> {account.name}<br>
+<b>РџСѓС‚СЊ:</b> {profile_path_str}
         """)
         layout.addWidget(info)
 
         cookies_edit = QTextEdit()
         cookies_edit.setPlaceholderText(
-            "Вставьте куки в формате:\n"
+            "Р’СЃС‚Р°РІСЊС‚Рµ РєСѓРєРё РІ С„РѕСЂРјР°С‚Рµ:\n"
             "sessionid2=value1; yandex_login=value2; L=value3"
         )
 
         cookies_file = profile_path / "Default" / "Cookies"
         if cookies_file.exists():
             cookies_edit.setPlainText(
-                f"Файл куков существует: {cookies_file}\n"
-                f"Размер: {cookies_file.stat().st_size} bytes\n\n"
-                "[Для редактирования куков используйте браузер]"
+                f"Р¤Р°Р№Р» РєСѓРєРѕРІ СЃСѓС‰РµСЃС‚РІСѓРµС‚: {cookies_file}\n"
+                f"Р Р°Р·РјРµСЂ: {cookies_file.stat().st_size} bytes\n\n"
+                "[Р”Р»СЏ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ РєСѓРєРѕРІ РёСЃРїРѕР»СЊР·СѓР№С‚Рµ Р±СЂР°СѓР·РµСЂ]"
             )
 
         layout.addWidget(cookies_edit)
@@ -1740,27 +1811,27 @@ class AccountsTabExtended(QWidget):
         if dialog.exec() == QDialog.Accepted:
             QMessageBox.information(
                 self,
-                "Информация",
-                "Для изменения куков откройте браузер с этим профилем,\n"
-                "войдите в Яндекс вручную или используйте кнопку 'Автологин'."
+                "РРЅС„РѕСЂРјР°С†РёСЏ",
+                "Р”Р»СЏ РёР·РјРµРЅРµРЅРёСЏ РєСѓРєРѕРІ РѕС‚РєСЂРѕР№С‚Рµ Р±СЂР°СѓР·РµСЂ СЃ СЌС‚РёРј РїСЂРѕС„РёР»РµРј,\n"
+                "РІРѕР№РґРёС‚Рµ РІ РЇРЅРґРµРєСЃ РІСЂСѓС‡РЅСѓСЋ РёР»Рё РёСЃРїРѕР»СЊР·СѓР№С‚Рµ РєРЅРѕРїРєСѓ 'РђРІС‚РѕР»РѕРіРёРЅ'."
             )
             
     def open_chrome_with_profile(self):
-        """Открыть Chrome с профилем выбранного аккаунта"""
+        """РћС‚РєСЂС‹С‚СЊ Chrome СЃ РїСЂРѕС„РёР»РµРј РІС‹Р±СЂР°РЅРЅРѕРіРѕ Р°РєРєР°СѓРЅС‚Р°"""
         import subprocess
         
         selected = self._selected_rows()
         if not selected:
-            QMessageBox.warning(self, "Внимание", "Выберите аккаунт для открытия Chrome")
+            QMessageBox.warning(self, "Р’РЅРёРјР°РЅРёРµ", "Р’С‹Р±РµСЂРёС‚Рµ Р°РєРєР°СѓРЅС‚ РґР»СЏ РѕС‚РєСЂС‹С‚РёСЏ Chrome")
             return
             
         if len(selected) > 1:
-            QMessageBox.warning(self, "Внимание", "Выберите только один аккаунт")
+            QMessageBox.warning(self, "Р’РЅРёРјР°РЅРёРµ", "Р’С‹Р±РµСЂРёС‚Рµ С‚РѕР»СЊРєРѕ РѕРґРёРЅ Р°РєРєР°СѓРЅС‚")
             return
             
         account = self._accounts[selected[0]]
         
-        # Определяем профиль
+        # РћРїСЂРµРґРµР»СЏРµРј РїСЂРѕС„РёР»СЊ
         base_dir = Path("C:/AI/yandex")
         profile_path = account.profile_path or f".profiles/{account.name}"
         profile_path_obj = Path(profile_path)
@@ -1768,7 +1839,7 @@ class AccountsTabExtended(QWidget):
             profile_path_obj = base_dir / profile_path_obj
         profile_path = str(profile_path_obj).replace("\\", "/")
             
-        # Запускаем Chrome
+        # Р—Р°РїСѓСЃРєР°РµРј Chrome
         chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
         
         try:
@@ -1779,14 +1850,14 @@ class AccountsTabExtended(QWidget):
                 "https://wordstat.yandex.ru"
             ])
             
-            self.log_action(f"Chrome запущен с профилем: {profile_path.split('/')[-1]}")
+            self.log_action(f"Chrome Р·Р°РїСѓС‰РµРЅ СЃ РїСЂРѕС„РёР»РµРј: {profile_path.split('/')[-1]}")
             
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось запустить Chrome: {str(e)}")
+            QMessageBox.critical(self, "РћС€РёР±РєР°", f"РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РїСѓСЃС‚РёС‚СЊ Chrome: {str(e)}")
         
     def _get_cookies_status(self, account):
-        """Получить статус куков для аккаунта (используем функцию из файла 42)"""
-        # Используем функцию get_cookies_status() из services/accounts.py
+        """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ РєСѓРєРѕРІ РґР»СЏ Р°РєРєР°СѓРЅС‚Р° (РёСЃРїРѕР»СЊР·СѓРµРј С„СѓРЅРєС†РёСЋ РёР· С„Р°Р№Р»Р° 42)"""
+        # РСЃРїРѕР»СЊР·СѓРµРј С„СѓРЅРєС†РёСЋ get_cookies_status() РёР· services/accounts.py
         return get_cookies_status(account)
 
 

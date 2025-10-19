@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Visual Browser Manager - CORRECTED
 Uses 5 working profiles (NOT wordstat_main!)
@@ -10,6 +11,8 @@ from typing import Optional, Dict, List
 from datetime import datetime
 from enum import Enum
 from playwright.async_api import async_playwright, Page, BrowserContext
+from ..services.proxy_manager import ProxyManager
+from ..utils.proxy import parse_proxy
 
 class BrowserStatus(Enum):
     IDLE = "idle"
@@ -28,6 +31,8 @@ class BrowserInstance:
         self.context = None
         self.page = None
         self.status = BrowserStatus.IDLE
+        self.proxy_id: Optional[str] = None
+        self.proxy_obj = None
 
 class VisualBrowserManager:
     """Manager for multiple Chrome browsers with working profiles"""
@@ -47,9 +52,11 @@ class VisualBrowserManager:
         self.num_browsers = min(num_browsers, len(self.AUTHORIZED_PROFILES))
         self.browsers = {}
         self.playwright = None
+        self.proxy_manager = ProxyManager.instance()
         
     async def start_browser(self, browser_id: int, account_name: str,
-                           profile_path: str, proxy: Optional[str] = None):
+                           profile_path: str, proxy: Optional[str] = None,
+                           proxy_id: Optional[str] = None):
         """Start Chrome with specified profile"""
         
         base_dir = Path("C:/AI/yandex")
@@ -70,12 +77,20 @@ class VisualBrowserManager:
         browser_instance.profile_path = profile_path
         
         try:
-            # Парсим прокси (из файла 41)
-            from ..utils.proxy import parse_proxy
-            proxy_config = parse_proxy(proxy) if proxy else None
-            
+            proxy_obj = None
+            proxy_config = None
+            if proxy_id:
+                proxy_obj = self.proxy_manager.acquire(proxy_id)
+                if proxy_obj:
+                    proxy_config = proxy_obj.playwright_config()
+                    server = proxy_config.get("server")
+                    if server and "://" not in server:
+                        proxy_config["server"] = f"http://{server}"
+            if proxy_config is None and proxy:
+                proxy_config = parse_proxy(proxy)
             if proxy_config:
-                print(f"[Browser {browser_id}] Proxy: {proxy_config['server']} (user: {proxy_config.get('username', 'none')})")
+                server = proxy_config.get("server", "")
+                print(f"[Browser {browser_id}] Proxy: {server} (user: {proxy_config.get('username', 'none')})")
             
             # Используем launch_persistent_context с прокси (правильный способ из файла 41!)
             browser_instance.context = await self.playwright.chromium.launch_persistent_context(
@@ -91,6 +106,8 @@ class VisualBrowserManager:
                     '--no-default-browser-check'
                 ]
             )
+            browser_instance.proxy_obj = proxy_obj
+            browser_instance.proxy_id = proxy_obj.id if proxy_obj else proxy_id
             
             # Получаем или создаем страницу
             if browser_instance.context.pages:
@@ -109,6 +126,8 @@ class VisualBrowserManager:
         except Exception as e:
             print(f"[Browser] Error: {e}")
             browser_instance.status = BrowserStatus.ERROR
+            if proxy_obj:
+                self.proxy_manager.release(proxy_obj)
             return browser_instance
     
     async def start_all_browsers(self, accounts: List[Dict]) -> None:
@@ -127,18 +146,21 @@ class VisualBrowserManager:
                 account_name = account.get('name', self.AUTHORIZED_PROFILES[i])
                 profile_path = account.get('profile_path', f".profiles/{account_name}")
                 proxy = account.get('proxy')
+                proxy_id = account.get('proxy_id')
             else:
                 # Use from authorized profiles if not enough accounts
                 account_name = self.AUTHORIZED_PROFILES[i]
                 profile_path = f".profiles/{account_name}"
                 proxy = None
+                proxy_id = None
             
             # Добавляем задачу в список (НЕ ЖДЕМ!)
             task = self.start_browser(
                 browser_id=i,
                 account_name=account_name,
                 profile_path=profile_path,
-                proxy=proxy
+                proxy=proxy,
+                proxy_id=proxy_id
             )
             tasks.append(task)
         
@@ -159,8 +181,12 @@ class VisualBrowserManager:
                 if browser_instance.context:
                     await browser_instance.context.close()
                     print(f"[Browser {browser_id}] Closed")
-            except:
+            except Exception:
                 pass
+            finally:
+                if browser_instance.proxy_obj:
+                    self.proxy_manager.release(browser_instance.proxy_obj)
+                    browser_instance.proxy_obj = None
         
         if self.playwright:
             await self.playwright.stop()
