@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# ⚠️ РЕДАКТИРОВАТЬ ТОЛЬКО В UTF-8!
 """
 Visual Browser Manager - CORRECTED
 Uses 5 working profiles (NOT wordstat_main!)
@@ -31,8 +32,8 @@ class BrowserInstance:
         self.context = None
         self.page = None
         self.status = BrowserStatus.IDLE
-        self.proxy_id: Optional[str] = None
         self.proxy_obj = None
+        self.proxy_id: Optional[str] = None
 
 class VisualBrowserManager:
     """Manager for multiple Chrome browsers with working profiles"""
@@ -78,20 +79,32 @@ class VisualBrowserManager:
         
         try:
             proxy_obj = None
-            proxy_config = None
+            proxy_config: Optional[Dict[str, str]] = None
+
             if proxy_id:
                 proxy_obj = self.proxy_manager.acquire(proxy_id)
                 if proxy_obj:
                     proxy_config = proxy_obj.playwright_config()
-                    server = proxy_config.get("server")
-                    if server and "://" not in server:
-                        proxy_config["server"] = f"http://{server}"
+                    server_value = proxy_config.get("server")
+                    if server_value and "://" not in server_value:
+                        proxy_config["server"] = f"http://{server_value}"
+
             if proxy_config is None and proxy:
-                proxy_config = parse_proxy(proxy)
+                parsed = parse_proxy(proxy)
+                if parsed:
+                    server_value = parsed.get("server")
+                    if server_value and "://" not in server_value:
+                        parsed["server"] = f"http://{server_value}"
+                    proxy_config = parsed
+
             if proxy_config:
-                server = proxy_config.get("server", "")
-                print(f"[Browser {browser_id}] Proxy: {server} (user: {proxy_config.get('username', 'none')})")
-            
+                print(
+                    f"[Browser {browser_id}] Proxy: {proxy_config.get('server')} "
+                    f"(user: {proxy_config.get('username', 'none')})"
+                )
+            else:
+                print(f"[Browser {browser_id}] Proxy: not set")
+
             # Используем launch_persistent_context с прокси (правильный способ из файла 41!)
             browser_instance.context = await self.playwright.chromium.launch_persistent_context(
                 user_data_dir=profile_path,
