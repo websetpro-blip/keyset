@@ -1,3 +1,4 @@
+:: UTF-8 encoding. Smoke runner entry point.
 @echo off
 setlocal
 cd /d "%~dp0\.."

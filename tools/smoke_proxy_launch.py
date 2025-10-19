@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+"""Smoke-тест запуска браузера с прокси (UTF-8)."""
+
 from __future__ import annotations
 
 import csv
@@ -65,7 +68,9 @@ def run_account(account, writer: csv.DictWriter) -> None:
     proxy_obj: Optional[Proxy] = None
     proxy_manager = ProxyManager.instance()
     if proxy_id:
-        proxy_obj = proxy_manager.get(proxy_id)
+        proxy_obj = proxy_manager.acquire(proxy_id)
+    else:
+        proxy_obj = None
 
     row = {
         "time": datetime.now().isoformat(timespec="seconds"),
@@ -112,9 +117,8 @@ def run_account(account, writer: csv.DictWriter) -> None:
             row["page_ip"] = ip_info.get("ip", "") or ""
 
         page.goto(WORDSTAT_URL, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_SEC * 1000)
-        page.locator("input[type=search], input[name='text']").first.wait_for(
-            timeout=PAGE_TIMEOUT_SEC * 1000
-        )
+        locator = page.locator("input.textinput__control, input[type='text']").first
+        locator.wait_for(timeout=PAGE_TIMEOUT_SEC * 1000)
         row["wordstat_ok"] = "YES"
 
     except Exception as exc:
@@ -127,6 +131,12 @@ def run_account(account, writer: csv.DictWriter) -> None:
                 _release_handle(handle)
         except Exception:
             pass
+        finally:
+            if proxy_obj:
+                try:
+                    proxy_manager.release(proxy_obj)
+                except Exception:
+                    pass
 
     writer.writerow(row)
     print(row)

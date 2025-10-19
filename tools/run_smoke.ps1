@@ -1,3 +1,4 @@
+# UTF-8 encoding. Smoke runner for proxy test.
 $ErrorActionPreference = "Stop"
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
