@@ -68,6 +68,15 @@ def ensure_schema() -> None:
             '''))
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_cluster_stem ON clusters(stem)"))
     
+    if inspector.has_table('accounts'):
+        with engine.begin() as conn:
+            columns = {row[1] for row in conn.execute(text('PRAGMA table_info(accounts)'))}
+            if 'proxy_id' not in columns:
+                conn.execute(text("ALTER TABLE accounts ADD COLUMN proxy_id VARCHAR(64)"))
+            if 'proxy_strategy' not in columns:
+                conn.execute(text("ALTER TABLE accounts ADD COLUMN proxy_strategy VARCHAR(32) DEFAULT 'fixed'"))
+                conn.execute(text("UPDATE accounts SET proxy_strategy = 'fixed' WHERE proxy_strategy IS NULL"))
+
     if not inspector.has_table('tasks'):
         return
 

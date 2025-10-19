@@ -1,5 +1,5 @@
 Write-Host "===================================" -ForegroundColor Cyan
-Write-Host "   SEMTOOL STARTUP CHECK" -ForegroundColor Cyan
+Write-Host "   KEYSET STARTUP CHECK" -ForegroundColor Cyan
 Write-Host "===================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -12,10 +12,10 @@ if ($LASTEXITCODE -ne 0) {
     exit 1 
 }
 
-Write-Host "[2/3] Checking ProxyStore..." -ForegroundColor Yellow
-python -c "from keyset.core import proxy_store; px = proxy_store.get_all_proxies(); print(f'[OK] ProxyStore: {len(px)} proxies')"
+Write-Host "[2/3] Checking Proxy registry..." -ForegroundColor Yellow
+python -c "from keyset.services.proxy_manager import ProxyManager; count = len(ProxyManager.instance().list(include_disabled=True)); print(f'[OK] ProxyManager: {count} proxies loaded')"
 if ($LASTEXITCODE -ne 0) { 
-    Write-Host "[FAIL] ProxyStore failed" -ForegroundColor Red
+    Write-Host "[FAIL] ProxyManager failed" -ForegroundColor Red
     exit 1 
 }
 

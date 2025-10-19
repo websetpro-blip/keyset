@@ -10,6 +10,7 @@ from sqlalchemy import select
 from ..core.db import SessionLocal
 from ..core.models import Account
 from ..utils.text_fix import fix_mojibake
+from .proxy_manager import ProxyManager
 
 # Для проверки прокси и автологина
 try:
@@ -36,8 +37,14 @@ def _sanitize_account(account: Account) -> Account:
     account.name = fix_mojibake(account.name)
     account.profile_path = fix_mojibake(account.profile_path)
     account.proxy = fix_mojibake(account.proxy)
+    account.proxy_id = fix_mojibake(account.proxy_id)
+    account.proxy_strategy = fix_mojibake(account.proxy_strategy) or "fixed"
     account.notes = fix_mojibake(account.notes)
     account.status = fix_mojibake(account.status)
+    if account.proxy_id and not account.proxy:
+        proxy = ProxyManager.instance().get(account.proxy_id)
+        if proxy:
+            account.proxy = proxy.uri()
     return account
 
 
@@ -48,27 +55,73 @@ def list_accounts() -> list[Account]:
         return [_sanitize_account(acc) for acc in result.scalars()]
 
 
-def create_account(name: str, profile_path: str, proxy: str | None = None, notes: str | None = None) -> Account:
+def create_account(
+    name: str,
+    profile_path: str,
+    proxy: str | None = None,
+    notes: str | None = None,
+    *,
+    proxy_id: str | None = None,
+    proxy_strategy: str = "fixed",
+) -> Account:
+    manager = ProxyManager.instance()
+    proxy_value = proxy or None
+    if proxy_id and not proxy_value:
+        proxy_obj = manager.get(proxy_id)
+        if proxy_obj:
+            proxy_value = proxy_obj.uri()
+
     with SessionLocal() as session:
-        account = Account(name=name, profile_path=profile_path, proxy=proxy or None, notes=notes)
+        account = Account(
+            name=name,
+            profile_path=profile_path,
+            proxy=proxy_value,
+            proxy_id=proxy_id,
+            proxy_strategy=proxy_strategy or "fixed",
+            notes=notes,
+        )
         session.add(account)
         session.commit()
         session.refresh(account)
         return _sanitize_account(account)
 
 
-def upsert_account(name: str, profile_path: str, proxy: str | None = None, notes: str | None = None) -> Account:
+def upsert_account(
+    name: str,
+    profile_path: str,
+    proxy: str | None = None,
+    notes: str | None = None,
+    *,
+    proxy_id: str | None = None,
+    proxy_strategy: str = "fixed",
+) -> Account:
+    manager = ProxyManager.instance()
+    proxy_value = proxy or None
+    if proxy_id and not proxy_value:
+        proxy_obj = manager.get(proxy_id)
+        if proxy_obj:
+            proxy_value = proxy_obj.uri()
+
     with SessionLocal() as session:
         stmt = select(Account).where(Account.name == name)
         existing = session.execute(stmt).scalar_one_or_none()
         if existing:
             existing.profile_path = profile_path
-            existing.proxy = proxy or None
+            existing.proxy = proxy_value
+            existing.proxy_id = proxy_id
+            existing.proxy_strategy = proxy_strategy or "fixed"
             existing.notes = notes
             session.commit()
             session.refresh(existing)
             return _sanitize_account(existing)
-        account = Account(name=name, profile_path=profile_path, proxy=proxy or None, notes=notes)
+        account = Account(
+            name=name,
+            profile_path=profile_path,
+            proxy=proxy_value,
+            proxy_id=proxy_id,
+            proxy_strategy=proxy_strategy or "fixed",
+            notes=notes,
+        )
         session.add(account)
         session.commit()
         session.refresh(account)
@@ -80,9 +133,36 @@ def update_account(account_id: int, **fields) -> Account:
         account = session.get(Account, account_id)
         if account is None:
             raise ValueError(f'Account {account_id} not found')
+        manager = ProxyManager.instance()
         for key, value in fields.items():
+            if key == "proxy_id":
+                account.proxy_id = value or None
+                proxy_obj = manager.get(value) if value else None
+                account.proxy = proxy_obj.uri() if proxy_obj else None
+                continue
+            if key == "proxy_strategy":
+                account.proxy_strategy = value or "fixed"
+                continue
+            if key == "proxy":
+                account.proxy = value or None
+                continue
             if hasattr(account, key):
                 setattr(account, key, value)
+        session.commit()
+        session.refresh(account)
+        return _sanitize_account(account)
+
+
+def set_account_proxy(account_id: int, proxy_id: str | None, strategy: str = "fixed") -> Account:
+    manager = ProxyManager.instance()
+    with SessionLocal() as session:
+        account = session.get(Account, account_id)
+        if account is None:
+            raise ValueError(f'Account {account_id} not found')
+        proxy_obj = manager.get(proxy_id) if proxy_id else None
+        account.proxy_id = proxy_id or None
+        account.proxy_strategy = strategy or "fixed"
+        account.proxy = proxy_obj.uri() if proxy_obj else None
         session.commit()
         session.refresh(account)
         return _sanitize_account(account)

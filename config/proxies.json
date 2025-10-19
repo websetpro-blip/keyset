@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "proxies": [
+    {
+      "id": "7c84918dc54544b783eb295a55367e37",
+      "label": "77.73.134.166:8000",
+      "type": "http",
+      "server": "http://77.73.134.166:8000",
+      "username": "TmNfbT",
+      "password": "YFB5cE",
+      "geo": "kz",
+      "sticky": false,
+      "max_concurrent": 0,
+      "enabled": true,
+      "notes": "",
+      "last_check": null,
+      "last_ip": null
+    }
+  ]
+}

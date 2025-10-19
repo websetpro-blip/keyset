@@ -25,13 +25,17 @@ from PySide6.QtWidgets import (
 )
 
 from ..services import accounts as account_service
-from ..services.accounts import test_proxy, get_cookies_status, autologin_account
+from ..services.accounts import test_proxy, get_cookies_status, autologin_account, set_account_proxy
 from ..services.captcha import CaptchaService
+from ..services.proxy_manager import ProxyManager
+from ..services.browser_factory import start_for_account
 from ..workers.visual_browser_manager import VisualBrowserManager, BrowserStatus
 # Старый worker больше не используется, теперь CDP подход
 
 PROFILE_SELECT_COLUMN = 5
 PROFILE_OPTIONS_ROLE = Qt.UserRole + 101
+PROXY_SELECT_COLUMN = 6
+PROXY_NONE_LABEL = "— Без прокси —"
 
 
 class ProfileComboDelegate(QStyledItemDelegate):
@@ -328,6 +332,11 @@ class AccountsTabExtended(QWidget):
         super().__init__()
         self.login_thread = None
         self._current_login_index = 0
+        self._proxy_manager = ProxyManager.instance()
+        self._proxy_cache = []
+        self._proxy_by_id = {}
+        self._proxy_by_uri = {}
+        self._browser_handles: List = []
         self.setup_ui()
         
     def setup_ui(self):
@@ -593,9 +602,10 @@ class AccountsTabExtended(QWidget):
         all_accounts = account_service.list_accounts()
         self._accounts = [acc for acc in all_accounts if acc.name != "demo_account"]
         self.table.setRowCount(len(self._accounts))
-        
+        self._reload_proxy_cache()
+
         self.log_action(f"Загружено: {len(self._accounts)} аккаунтов")
-        
+
         self.table.blockSignals(True)
         for row, account in enumerate(self._accounts):
             # Чекбокс
@@ -609,12 +619,12 @@ class AccountsTabExtended(QWidget):
                 QTableWidgetItem(self._get_status_label(account.status)),
                 QTableWidgetItem(self._get_auth_status(account)),  # Изменено
                 QTableWidgetItem(account.profile_path or f".profiles/{account.name}"),
-                None,  # Для комбобокса  
-                QTableWidgetItem(self._format_proxy(account.proxy)),  # Форматируем прокси
+                None,  # Для комбобокса
+                None,  # Заполним комбобоксом прокси
                 QTableWidgetItem(self._get_activity_status(account)),  # Изменено
                 QTableWidgetItem(self._get_cookies_status(account))  # Показываем статус куков
             ]
-            
+
             # Устанавливаем элементы
             for col, item in enumerate(items):
                 if item is not None:
@@ -629,7 +639,8 @@ class AccountsTabExtended(QWidget):
             profile_item.setData(PROFILE_OPTIONS_ROLE, profile_options)
             profile_item.setFlags(profile_item.flags() | Qt.ItemIsEditable)
             self.table.setItem(row, PROFILE_SELECT_COLUMN, profile_item)
-        
+            self._set_proxy_cell(row, account)
+
         self.table.blockSignals(False)
         self._update_buttons()
 
@@ -678,6 +689,76 @@ class AccountsTabExtended(QWidget):
             if option_value == value:
                 return label
         return AccountsTabExtended._format_profile_label(value)
+
+    # ------------------------------------------------------------------
+    # Работа с прокси
+    # ------------------------------------------------------------------
+
+    def _reload_proxy_cache(self) -> None:
+        proxies = self._proxy_manager.list(include_disabled=True)
+        self._proxy_cache = proxies
+        self._proxy_by_id = {proxy.id: proxy for proxy in proxies if proxy.id}
+        self._proxy_by_uri = {}
+        for proxy in proxies:
+            self._proxy_by_uri[proxy.uri()] = proxy
+            self._proxy_by_uri[proxy.uri(include_credentials=False)] = proxy
+
+    def _set_proxy_cell(self, row: int, account) -> None:
+        combo = self._build_proxy_combo(account)
+        self.table.setCellWidget(row, PROXY_SELECT_COLUMN, combo)
+
+    def _build_proxy_combo(self, account):
+        combo = QComboBox()
+        combo.setEditable(False)
+        combo.addItem(PROXY_NONE_LABEL, None)
+
+        for proxy in self._proxy_cache:
+            combo.addItem(proxy.display_label(), proxy.id)
+            if not proxy.enabled:
+                index = combo.count() - 1
+                combo.setItemData(index, Qt.gray, Qt.ForegroundRole)
+
+        current_id = self._resolve_proxy_id(account)
+        if current_id is not None:
+            index = combo.findData(current_id)
+            if index >= 0:
+                combo.setCurrentIndex(index)
+
+        combo.setProperty("account_id", getattr(account, "id", None))
+        combo.setProperty("account_name", getattr(account, "name", None))
+        combo.currentIndexChanged.connect(lambda _, widget=combo: self._on_proxy_changed(widget))
+        return combo
+
+    def _resolve_proxy_id(self, account) -> Optional[str]:
+        if getattr(account, "proxy_id", None):
+            return account.proxy_id
+        proxy_uri = (account.proxy or "").strip()
+        if not proxy_uri:
+            return None
+        proxy = self._proxy_by_uri.get(proxy_uri)
+        return proxy.id if proxy else None
+
+    def _on_proxy_changed(self, combo: QComboBox) -> None:
+        account_id = combo.property("account_id")
+        if account_id is None:
+            return
+        proxy_id = combo.currentData()
+        try:
+            updated = set_account_proxy(account_id, proxy_id, strategy="fixed")
+        except Exception as exc:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось привязать прокси: {exc}")
+            self.refresh()
+            return
+
+        for account in self._accounts:
+            if getattr(account, "id", None) == account_id:
+                account.proxy_id = updated.proxy_id
+                account.proxy = updated.proxy
+                account.proxy_strategy = updated.proxy_strategy
+                break
+
+        account_name = combo.property("account_name") or account_id
+        self.log_action(f"Прокси для {account_name}: {combo.currentText()}")
     
     def _get_status_label(self, status):
         """Получить метку статуса"""
@@ -968,11 +1049,12 @@ class AccountsTabExtended(QWidget):
     def open_proxy_manager(self):
         """Открыть Proxy Manager (немодальное окно)"""
         from .proxy_manager import ProxyManagerDialog
-        
+
         # Создаем и показываем окно
         proxy_manager = ProxyManagerDialog(self)
+        proxy_manager.finished.connect(lambda *_: self.refresh())
         proxy_manager.show()  # НЕ exec() - немодальное!
-        
+
         self.log_action("Открыт Proxy Manager")
     
     def check_captcha_balance(self):
@@ -1041,57 +1123,37 @@ class AccountsTabExtended(QWidget):
             self.log_action(f"RuCaptcha ошибка: {result['error']}")
     
     def login_selected(self):
-        """Открыть Chrome с CDP для ручного логина"""
+        """Открыть браузеры для ручного логина с учетом привязанного прокси."""
         selected_rows = self._selected_rows()
         if not selected_rows:
             QMessageBox.warning(self, "Внимание", "Выберите аккаунты для логина")
             return
-        
-        import subprocess
-        from pathlib import Path
-        import psutil
-        
-        chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-        
-        # Убиваем все процессы Chrome перед запуском
-        for proc in psutil.process_iter(['pid', 'name']):
-            try:
-                if 'chrome.exe' in proc.info['name'].lower():
-                    proc.kill()
-            except:
-                pass
-        
-        import time
-        time.sleep(1)
-        
-        base_dir = Path("C:/AI/yandex")
+
+        self._release_browser_handles()
+
+        opened = 0
         for row in selected_rows:
             account = self._accounts[row]
-            # Берем профиль ИЗ БАЗЫ ДАННЫХ
-            profile_path = account.profile_path or f".profiles/{account.name}"
+            handle = self._launch_browser_handle(
+                account,
+                target_url="https://wordstat.yandex.ru/?region=225",
+                prefer_cdp=False,
+            )
+            if handle:
+                opened += 1
 
-            profile_path_obj = Path(profile_path)
-            if not profile_path_obj.is_absolute():
-                profile_path_obj = base_dir / profile_path_obj
-            profile_path = str(profile_path_obj).replace("\\", "/")
-            
-            # Используем уникальный порт для каждого аккаунта
-            port = 9222 + (hash(account.name) % 100)
-            
-            # Запускаем Chrome с CDP портом (БЕЗ флагов автоматизации!)
-            # Это ОБЫЧНЫЙ Chrome с возможностью подключения через CDP
-            subprocess.Popen([
-                chrome_path,
-                f"--user-data-dir={profile_path}",
-                f"--remote-debugging-port={port}",  # Уникальный CDP порт!
-                "--no-first-run",
-                "--no-default-browser-check",
-                "https://wordstat.yandex.ru"
-            ])
-            
-            self.log_action(f"Chrome запущен для {account.name} на порту {port}")
-        
-        self.log_action(f"Открыто Chrome с CDP для ручного логина: {len(selected_rows)}")
+        if opened:
+            QMessageBox.information(
+                self,
+                "Готово",
+                f"Открыто {opened} браузеров. Проверьте авторизацию и обновите статусы.",
+            )
+        else:
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "Не удалось открыть браузеры для выбранных аккаунтов.",
+            )
     
     def auto_login_selected(self):
         """Автоматическая авторизация ВЫБРАННЫХ аккаунтов (где стоят галочки)"""
@@ -1173,111 +1235,122 @@ class AccountsTabExtended(QWidget):
             QMessageBox.warning(self, "Ошибка автологина", message)
     
     def launch_browsers_cdp(self):
-        """Открыть браузеры для парсинга с CDP портами БЕЗ АВТОЛОГИНА!"""
-        import subprocess
-        import time
-        from pathlib import Path
-        
-        # ПРАВИЛО №1: НЕ ЛОМАТЬ ТО ЧТО РАБОТАЕТ!
-        # Получаем ТОЛЬКО ВЫБРАННЫЕ аккаунты
+        """Открыть браузеры для парсинга, учитывая выбранные прокси."""
         selected_rows = self._selected_rows()
         if not selected_rows:
             QMessageBox.warning(self, "Внимание", "Выберите аккаунты для запуска")
             return
-        
-        # Получаем имена аккаунтов напрямую из списка _accounts
-        selected_accounts = []
-        for row in selected_rows:
-            if row < len(self._accounts):
-                selected_accounts.append(self._accounts[row])
+
+        selected_accounts = [
+            self._accounts[row] for row in selected_rows if row < len(self._accounts)
+        ]
 
         self.log_action(f"Запуск {len(selected_accounts)} выбранных браузеров для парсинга...")
-        
-        # Спрашиваем подтверждение
-        reply = QMessageBox.question(self, "Запуск браузеров",
-            f"Будет запущено {len(selected_accounts)} браузеров с CDP портами.\n\n"
-            f"Выбранные аккаунты:\n" + "\n".join([f"  • {acc.name}" for acc in selected_accounts]) + "\n\n"
-            f"Браузеры откроются с существующими куками.\n"
-            f"НЕ БУДЕТ попыток автологина.\n"
-            f"Все существующие Chrome будут закрыты.\n\n"
-            f"Продолжить?")
-        
+
+        reply = QMessageBox.question(
+            self,
+            "Запуск браузеров",
+            f"Будет запущено {len(selected_accounts)} браузеров для парсинга.\n\n"
+            f"Аккаунты:\n" + "\n".join(f"  • {acc.name}" for acc in selected_accounts) + "\n\n"
+            "Браузеры откроются с существующими куками без попытки автологина.\n"
+            "Продолжить?",
+        )
+
         if reply != QMessageBox.Yes:
             return
-            
-        self.log_action("Закрываю старые Chrome процессы...")
-        
-        # Убиваем старые Chrome
-        subprocess.run(
-            ["taskkill", "/F", "/IM", "chrome.exe"], 
-            capture_output=True, 
-            shell=True
-        )
-        time.sleep(2)
-        
-        chrome_exe = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-        
-        # Запускаем ТОЛЬКО ВЫБРАННЫЕ браузеры
+
+        self._release_browser_handles()
         launched = 0
-        port_base = 9222
-        
-        for i, account in enumerate(selected_accounts):
-            port = port_base + i
-            profile_path = Path(self._normalize_profile_path(account.profile_path, account.name))
-            
-            # Проверяем профиль
-            if not profile_path.exists():
-                self.log_action(f"[ERROR] Профиль не найден: {profile_path}")
-                continue
-                
-            # Проверяем куки
-            cookies_file = profile_path / "Default" / "Network" / "Cookies"
-            if cookies_file.exists():
-                size_kb = cookies_file.stat().st_size / 1024
-                self.log_action(f"[{account.name}] Cookies: {size_kb:.1f}KB")
-            else:
-                self.log_action(f"[{account.name}] WARNING: Cookies not found!")
-            
-            # Запускаем Chrome с CDP БЕЗ playwright, БЕЗ автологина!
-            cmd = [
-                chrome_exe,
-                f"--user-data-dir={profile_path}",
-                f"--remote-debugging-port={port}",
-                "--start-maximized",
-                "--disable-blink-features=AutomationControlled",
-                "https://wordstat.yandex.ru/?region=225"
-            ]
-            
-            self.log_action(f"[{account.name}] Запуск Chrome на порту {port}...")
-            
-            try:
-                subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
+
+        for account in selected_accounts:
+            handle = self._launch_browser_handle(
+                account,
+                target_url="https://wordstat.yandex.ru/?region=225",
+                prefer_cdp=True,
+            )
+            if handle:
                 launched += 1
-                self.log_action(f"[{account.name}] ✅ Chrome запущен на порту {port}")
-                time.sleep(3)  # Задержка между запусками
-            except Exception as e:
-                self.log_action(f"[{account.name}] ❌ Ошибка: {e}")
-        
-        if launched > 0:
-            self.log_action(f"\n✅ Запущено {launched} браузеров!")
-            # Показываем правильные порты
-            ports = [str(9222 + i) for i in range(launched)]
-            self.log_action(f"CDP порты: {', '.join(ports)}")
-            self.log_action(f"Теперь можно запускать парсер!")
-            
-            QMessageBox.information(self, "Успех", 
-                f"Запущено {launched} браузеров с CDP!\n\n"
-                f"Аккаунты: {', '.join(acc.name for acc in selected_accounts[:launched])}\n"
-                f"Порты: {', '.join(ports)}\n\n"
-                f"Браузеры открыты с существующими куками.\n"
-                f"Теперь запустите парсер.")
+
+        if launched:
+            QMessageBox.information(
+                self,
+                "Успех",
+                f"Запущено {launched} браузеров. Теперь можно запускать парсер.",
+            )
         else:
             self.log_action("❌ Не удалось запустить браузеры")
             QMessageBox.warning(self, "Ошибка", "Не удалось запустить браузеры")
+
+    def _launch_browser_handle(self, account, *, target_url: str, prefer_cdp: bool):
+        """Запустить браузер через BrowserFactory и вернуть handle."""
+        try:
+            handle = start_for_account(
+                account_id=account.id,
+                headless=False,
+                use_cdp=prefer_cdp,
+                profile_override=account.profile_path or f".profiles/{account.name}",
+            )
+        except Exception as exc:
+            self.log_action(f"[{account.name}] ❌ Ошибка запуска браузера: {exc}")
+            return None
+
+        self._browser_handles.append(handle)
+
+        mode = "CDP attach" if handle.kind == "cdp" else "PW persistent"
+        proxy_label = handle.proxy_id or getattr(account, "proxy_id", None) or getattr(account, "proxy", None) or "-"
+        self.log_action(f"[{account.name}] {mode} (proxy={proxy_label})")
+
+        metadata = getattr(handle, "metadata", {}) or {}
+        if handle.kind == "cdp":
+            port = metadata.get("cdp_port") if isinstance(metadata, dict) else None
+            if port:
+                self.log_action(f"[{account.name}] CDP порт: {port}")
+
+        preflight = metadata.get("preflight") if isinstance(metadata, dict) else None
+        if isinstance(preflight, dict):
+            if preflight.get("ok"):
+                ip_value = preflight.get("ip")
+                if ip_value:
+                    self.log_action(f"[{account.name}] Proxy preflight ip={ip_value}")
+                else:
+                    self.log_action(f"[{account.name}] Proxy preflight: OK")
+            else:
+                self.log_action(f"[{account.name}] Proxy preflight failed: {preflight.get('error')}")
+
+        # Открываем целевой URL
+        try:
+            if handle.page:
+                handle.page.goto(target_url, wait_until="domcontentloaded")
+        except Exception as exc:
+            self.log_action(f"[{account.name}] ⚠️ Не удалось открыть {target_url}: {exc}")
+
+        self._log_proxy_ip(account.name, handle)
+        return handle
+
+    def _log_proxy_ip(self, account_name: str, handle) -> None:
+        if not getattr(handle, "page", None):
+            return
+        try:
+            ip_info = handle.page.evaluate(
+                "() => fetch('https://api.ipify.org?format=json').then(r => r.json())"
+            )
+            ip_value = ip_info.get("ip") if isinstance(ip_info, dict) else ip_info
+            if ip_value:
+                self.log_action(f"[{account_name}] IP через прокси: {ip_value}")
+            else:
+                self.log_action(f"[{account_name}] Не удалось получить IP (пустой ответ)")
+        except Exception as exc:
+            self.log_action(f"[{account_name}] ⚠️ Ошибка проверки IP: {exc}")
+
+    def _release_browser_handles(self) -> None:
+        if not self._browser_handles:
+            return
+        for handle in list(self._browser_handles):
+            try:
+                handle.release_cb()
+            except Exception:
+                pass
+        self._browser_handles.clear()
     
     def login_all(self):
         """Автологин для новых аккаунтов - последовательная авторизация"""
@@ -1411,7 +1484,8 @@ class AccountsTabExtended(QWidget):
                 accounts_to_check.append({
                     "account": acc,
                     "has_cookies": cookie_file.exists(),
-                    "profile_path": str(profile_full_path)
+                    "profile_path": str(profile_full_path),
+                    "proxy": getattr(acc, "proxy", None),
                 })
         
         if not accounts_to_check:
@@ -1427,11 +1501,34 @@ class AccountsTabExtended(QWidget):
         msg += "Открыть браузеры?"
         
         reply = QMessageBox.question(self, "Открыть браузеры для логина", msg)
-        if reply == QMessageBox.Yes:
-            # Запускаем браузеры для всех аккаунтов для визуального парсинга
-            # Извлекаем объекты аккаунтов из словарей
-            all_accounts = [item["account"] for item in accounts_to_check]
-            self._start_login(all_accounts, visual_mode=True)
+        if reply != QMessageBox.Yes:
+            return
+
+        self._release_browser_handles()
+
+        launched = 0
+        for info in accounts_to_check:
+            account = info["account"]
+            handle = self._launch_browser_handle(
+                account,
+                target_url="https://wordstat.yandex.ru/?region=225",
+                prefer_cdp=False,
+            )
+            if handle:
+                launched += 1
+
+        if launched:
+            QMessageBox.information(
+                self,
+                "Готово",
+                f"Открыто {launched} браузеров. Войдите вручную и обновите статусы.",
+            )
+        else:
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "Не удалось открыть браузеры для визуального парсинга.",
+            )
     
     def show_browser_status(self):
         """Показать статус браузеров"""
@@ -1460,12 +1557,26 @@ class AccountsTabExtended(QWidget):
             QMessageBox.warning(self, "Внимание", "Браузеры не запущены")
     
     def close_all_browsers(self):
-        """Закрыть все браузеры"""
+        """Закрыть все открытые браузеры (и через BrowserFactory, и через VisualBrowserManager)."""
+        closed = False
+
+        if self._browser_handles:
+            for handle in list(self._browser_handles):
+                try:
+                    handle.release_cb()
+                except Exception:
+                    pass
+            self._browser_handles.clear()
+            closed = True
+
         if hasattr(self, 'browser_manager') and self.browser_manager:
-            reply = QMessageBox.question(self, "Подтверждение",
+            reply = QMessageBox.question(
+                self,
+                "Подтверждение",
                 "Закрыть все браузеры?",
-                QMessageBox.Yes | QMessageBox.No)
-            
+                QMessageBox.Yes | QMessageBox.No,
+            )
+
             if reply == QMessageBox.Yes:
                 try:
                     import asyncio
@@ -1474,9 +1585,11 @@ class AccountsTabExtended(QWidget):
                     loop.run_until_complete(self.browser_manager.close_all())
                     self.browser_manager = None
                     QMessageBox.information(self, "Готово", "Браузеры закрыты")
+                    closed = True
                 except Exception as e:
                     QMessageBox.warning(self, "Ошибка", f"Ошибка при закрытии: {e}")
-        else:
+
+        if not closed:
             QMessageBox.information(self, "Информация", "Браузеры не запущены")
     
     def on_table_double_click(self, item):
@@ -1675,4 +1788,7 @@ class AccountsTabExtended(QWidget):
         """Получить статус куков для аккаунта (используем функцию из файла 42)"""
         # Используем функцию get_cookies_status() из services/accounts.py
         return get_cookies_status(account)
+
+
+
 
