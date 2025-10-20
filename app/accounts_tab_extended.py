@@ -1377,10 +1377,9 @@ class AccountsTabExtended(QWidget):
             else:
                 self.log_action(f"[{account.name}] Proxy preflight failed: {preflight.get('error')}")
 
-        # Открываем целевой URL
         try:
             if handle.page:
-                handle.page.goto(target_url, wait_until="domcontentloaded")
+                self._warmup_browser(handle, target_url, account.name)
         except Exception as exc:
             self.log_action(f"[{account.name}] ⚠️ Не удалось открыть {target_url}: {exc}")
 
@@ -1401,6 +1400,33 @@ class AccountsTabExtended(QWidget):
                 self.log_action(f"[{account_name}] Не удалось получить IP (пустой ответ)")
         except Exception as exc:
             self.log_action(f"[{account_name}] ⚠️ Ошибка проверки IP: {exc}")
+
+    def _warmup_browser(self, handle, target_url: str, account_name: str) -> None:
+        page = handle.page
+        context = getattr(handle, "context", None)
+        if not page or context is None:
+            return
+
+        try:
+            page.goto(
+                "https://yandex.ru/internet",
+                wait_until="domcontentloaded",
+                timeout=45000,
+            )
+            self.log_action(f"[{account_name}] Открыта страница проверки IP")
+        except Exception as exc:
+            self.log_action(f"[{account_name}] ⚠️ Не удалось открыть https://yandex.ru/internet: {exc}")
+
+        if not target_url or "yandex.ru/internet" in target_url:
+            return
+
+        try:
+            work_page = context.new_page()
+            work_page.goto(target_url, wait_until="domcontentloaded", timeout=60000)
+            handle.page = work_page
+            self.log_action(f"[{account_name}] Открыта вкладка {target_url}")
+        except Exception as exc:
+            self.log_action(f"[{account_name}] ⚠️ Не удалось загрузить {target_url}: {exc}")
 
     def _release_browser_handles(self) -> None:
         if not self._browser_handles:
