@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 import subprocess
 import time
@@ -19,6 +20,8 @@ from ..utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT
 from .proxy_manager import Proxy, ProxyManager
 
 BASE_DIR = Path("C:/AI/yandex")
+RUNTIME_DIR = BASE_DIR / "runtime"
+PROXY_EXT_DIR = RUNTIME_DIR / "proxy_extensions"
 
 
 @dataclass
@@ -109,8 +112,15 @@ def for_account(
         manager.release(proxy_obj)
         raise RuntimeError(f"Proxy preflight failed: {preflight['error']}")
 
+    proxy_extension_dir: Optional[Path] = None
     if use_cdp and proxy_requires_auth:
-        use_cdp = False
+        try:
+            proxy_extension_dir = _ensure_proxy_extension(proxy_obj)
+        except Exception as exc:
+            print(f"[BF] Proxy extension error: {exc}")
+            proxy_extension_dir = None
+        if proxy_extension_dir is None:
+            use_cdp = False
 
     if not use_cdp:
         playwright = sync_playwright().start()
@@ -119,7 +129,6 @@ def for_account(
             "headless": headless,
             "proxy": proxy_kwargs,
             "args": [
-                "--disable-blink-features=AutomationControlled",
                 "--start-maximized",
                 "--no-first-run",
                 "--no-default-browser-check",
@@ -184,17 +193,27 @@ def for_account(
         chrome_exe,
         f"--remote-debugging-port={cdp_port}",
         f"--user-data-dir={profile_dir}",
-        "--disable-extensions",
-        "--disable-blink-features=AutomationControlled",
+        "--disable-infobars",
         "--no-first-run",
+        "--no-default-browser-check",
         "--start-maximized",
         *additional_args,
     ]
 
+    if proxy_extension_dir:
+        ext_path = str(proxy_extension_dir)
+        cmd.append(f'--disable-extensions-except={ext_path}')
+        cmd.append(f'--load-extension={ext_path}')
+    else:
+        cmd.append("--disable-extensions")
+
     if proxy_obj:
-        cmd.append(proxy_obj.chrome_flag())
+        scheme, _, host_port = proxy_obj.server.partition("://")
+        cmd.append(f'--proxy-server={scheme}://{host_port}')
     elif proxy_kwargs:
-        cmd.append(f'--proxy-server="{proxy_kwargs["server"]}"')
+        server = proxy_kwargs.get("server")
+        if server:
+            cmd.append(f'--proxy-server={server}')
 
     process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -215,20 +234,20 @@ def for_account(
         manager.release(proxy_obj)
         raise RuntimeError(f"Unable to connect to Chrome on port {cdp_port}: {last_error}")
 
-        context = browser.contexts[0] if browser.contexts else browser.new_context()
-        context.add_init_script(script=WORDSTAT_FETCH_NORMALIZER_SCRIPT)
-        for existing_page in context.pages:
-            existing_page.add_init_script(script=WORDSTAT_FETCH_NORMALIZER_SCRIPT)
-            try:
-                existing_page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
-            except Exception:
-                pass
-        page = context.pages[0] if context.pages else context.new_page()
-        _wire_logging(page)
+    context = browser.contexts[0] if browser.contexts else browser.new_context()
+    context.add_init_script(script=WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+    for existing_page in context.pages:
+        existing_page.add_init_script(script=WORDSTAT_FETCH_NORMALIZER_SCRIPT)
         try:
-            page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+            existing_page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
         except Exception:
             pass
+    page = context.pages[0] if context.pages else context.new_page()
+    _wire_logging(page)
+    try:
+        page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+    except Exception:
+        pass
     print(
         f"[BF] CDP attach (proxy={'none' if not proxy_obj else proxy_obj.id}) "
         f"preflight_ip={preflight.get('ip')}"
@@ -346,3 +365,74 @@ def _wire_logging(page: Any) -> None:
         page.on("console", lambda m: print(f"[BF][CONSOLE] {m.type}: {m.text}"))
     except Exception:
         pass
+
+
+def _ensure_proxy_extension(proxy: Optional[Proxy]) -> Optional[Path]:
+    if proxy is None or not proxy.has_auth:
+        return None
+
+    try:
+        scheme, _, host_port = proxy.server.partition("://")
+        host, _, port = host_port.partition(":")
+        port = port or "80"
+    except Exception:
+        return None
+
+    PROXY_EXT_DIR.mkdir(parents=True, exist_ok=True)
+    ext_dir = PROXY_EXT_DIR / proxy.id
+    ext_dir.mkdir(parents=True, exist_ok=True)
+
+    manifest = {
+        "manifest_version": 2,
+        "name": f"ProxyAuth {proxy.id}",
+        "version": "1.0",
+        "permissions": [
+            "proxy",
+            "storage",
+            "tabs",
+            "activeTab",
+            "webRequest",
+            "webRequestBlocking",
+            "<all_urls>",
+        ],
+        "background": {"scripts": ["background.js"]},
+        "minimum_chrome_version": "87"
+    }
+
+    manifest_path = ext_dir / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    username = json.dumps(proxy.username or "")
+    password = json.dumps(proxy.password or "")
+
+    background = f"""
+chrome.runtime.onInstalled.addListener(function() {{
+  var config = {{
+    mode: "fixed_servers",
+    rules: {{
+      singleProxy: {{
+        scheme: "{scheme}",
+        host: "{host}",
+        port: parseInt("{port}", 10)
+      }},
+      bypassList: []
+    }}
+  }};
+  chrome.proxy.settings.set({{value: config, scope: "regular"}});
+}});
+
+chrome.webRequest.onAuthRequired.addListener(
+  function(details) {{
+    return {{
+      authCredentials: {{
+        username: {username},
+        password: {password}
+      }}
+    }};
+  }},
+  {{urls: ["<all_urls>"]}},
+  ["blocking"]
+);
+"""
+    (ext_dir / "background.js").write_text(background.strip() + "\n", encoding="utf-8")
+    return ext_dir
