@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import shutil
 import subprocess
 import time
 import urllib.error
@@ -201,9 +202,9 @@ def for_account(
     ]
 
     if proxy_extension_dir:
-        ext_path = str(proxy_extension_dir)
-        cmd.append(f'--disable-extensions-except={ext_path}')
-        cmd.append(f'--load-extension={ext_path}')
+        ext_path = str(proxy_extension_dir).replace("\\", "/")
+        cmd.append(f'--disable-extensions-except="{ext_path}"')
+        cmd.append(f'--load-extension="{ext_path}"')
     else:
         cmd.append("--disable-extensions")
 
@@ -263,7 +264,17 @@ def for_account(
                 try:
                     process.terminate()
                 finally:
+                    if proxy_extension_dir and proxy_extension_dir.exists():
+                        shutil.rmtree(proxy_extension_dir, ignore_errors=True)
                     manager.release(proxy_obj)
+
+    metadata: Dict[str, Any] = {
+        "profile_dir": str(profile_dir),
+        "cdp_port": cdp_port,
+        "preflight": preflight,
+    }
+    if proxy_extension_dir:
+        metadata["proxy_extension_dir"] = str(proxy_extension_dir)
 
     return BrowserContextHandle(
         kind="cdp",
@@ -272,11 +283,7 @@ def for_account(
         page=page,
         proxy_id=proxy_obj.id if proxy_obj else None,
         release_cb=_release,
-        metadata={
-            "profile_dir": str(profile_dir),
-            "cdp_port": cdp_port,
-            "preflight": preflight,
-        },
+        metadata=metadata,
     )
 
 
@@ -379,24 +386,23 @@ def _ensure_proxy_extension(proxy: Optional[Proxy]) -> Optional[Path]:
         return None
 
     PROXY_EXT_DIR.mkdir(parents=True, exist_ok=True)
-    ext_dir = PROXY_EXT_DIR / proxy.id
+    ext_dir = PROXY_EXT_DIR / f"{proxy.id}_{int(time.time() * 1000)}"
     ext_dir.mkdir(parents=True, exist_ok=True)
 
     manifest = {
-        "manifest_version": 2,
+        "manifest_version": 3,
         "name": f"ProxyAuth {proxy.id}",
         "version": "1.0",
         "permissions": [
             "proxy",
             "storage",
-            "tabs",
-            "activeTab",
             "webRequest",
+            "webRequestAuthProvider",
             "webRequestBlocking",
-            "<all_urls>",
         ],
-        "background": {"scripts": ["background.js"]},
-        "minimum_chrome_version": "87"
+        "host_permissions": ["<all_urls>"],
+        "background": {"service_worker": "background.js"},
+        "minimum_chrome_version": "109",
     }
 
     manifest_path = ext_dir / "manifest.json"
@@ -406,23 +412,28 @@ def _ensure_proxy_extension(proxy: Optional[Proxy]) -> Optional[Path]:
     password = json.dumps(proxy.password or "")
 
     background = f"""
-chrome.runtime.onInstalled.addListener(function() {{
-  var config = {{
-    mode: "fixed_servers",
-    rules: {{
-      singleProxy: {{
-        scheme: "{scheme}",
-        host: "{host}",
-        port: parseInt("{port}", 10)
-      }},
-      bypassList: []
-    }}
-  }};
-  chrome.proxy.settings.set({{value: config, scope: "regular"}});
-}});
+const proxyConfig = {{
+  mode: "fixed_servers",
+  rules: {{
+    singleProxy: {{
+      scheme: "{scheme}",
+      host: "{host}",
+      port: parseInt("{port}", 10)
+    }},
+    bypassList: []
+  }}
+}};
+
+function configureProxy() {{
+  chrome.proxy.settings.set({{ value: proxyConfig, scope: "regular" }}, () => chrome.runtime.lastError);
+}}
+
+chrome.runtime.onInstalled.addListener(configureProxy);
+chrome.runtime.onStartup.addListener(configureProxy);
+configureProxy();
 
 chrome.webRequest.onAuthRequired.addListener(
-  function(details) {{
+  (details) => {{
     return {{
       authCredentials: {{
         username: {username},
@@ -430,8 +441,8 @@ chrome.webRequest.onAuthRequired.addListener(
       }}
     }};
   }},
-  {{urls: ["<all_urls>"]}},
-  ["blocking"]
+  {{ urls: ["<all_urls>"] }},
+  ["asyncBlocking"]
 );
 """
     (ext_dir / "background.js").write_text(background.strip() + "\n", encoding="utf-8")
