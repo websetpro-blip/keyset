@@ -8,6 +8,7 @@ import asyncio
 import time
 import json
 import random
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -16,6 +17,7 @@ from urllib.parse import quote
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
 
 from ..utils.proxy import parse_proxy
+from ..utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT, fix_mojibake
 from ..core.db import SessionLocal
 from ..core.models import Account
 from ..services.proxy_manager import ProxyManager, proxy_preflight, Proxy
@@ -33,6 +35,111 @@ def _ensure_wired(page: Page) -> None:
         return
     _wire_logging(page)
     setattr(page, "_turbo_ws_wired", True)
+
+
+_WORDSTAT_ENCODINGS: tuple[str, ...] = ("utf-8", "windows-1251", "cp1251", "latin-1")
+
+
+async def _parse_wordstat_json(response) -> Optional[dict]:
+    """Считывает тело ответа Wordstat с учётом charset."""
+    try:
+        raw = await response.body()
+    except Exception:
+        raw = b""
+
+    content_type = ""
+    try:
+        content_type = response.headers.get("content-type", "")
+    except Exception:
+        content_type = ""
+
+    encodings: list[str] = []
+    match = re.search(r"charset=([^;]+)", content_type or "", flags=re.IGNORECASE)
+    if match:
+        enc = match.group(1).strip().lower()
+        if enc:
+            encodings.append(enc)
+    for enc in _WORDSTAT_ENCODINGS:
+        if enc not in encodings:
+            encodings.append(enc)
+
+    last_exc: Optional[Exception] = None
+    for encoding in encodings:
+        try:
+            text = raw.decode(encoding, errors="strict")
+            return json.loads(text)
+        except Exception as exc:
+            last_exc = exc
+            continue
+    if last_exc:
+        print(f"[TURBO] Не удалось декодировать ответ Wordstat: {last_exc}")
+    return None
+
+
+def _normalize_wordstat_payload(data: Dict[str, Any]) -> None:
+    """Преобразует tableData → items/related, чтобы код дальше не ломался."""
+    if not isinstance(data, dict):
+        return
+    table = data.get("table")
+    if not isinstance(table, dict):
+        return
+    table_data = table.get("tableData")
+    if not isinstance(table_data, dict):
+        return
+
+    def _norm(entries: Optional[List[Any]]) -> List[Dict[str, Any]]:
+        normalized: List[Dict[str, Any]] = []
+        for item in entries or []:
+            phrase: str = ""
+            count: Any = 0
+            if isinstance(item, dict):
+                phrase = (
+                    item.get("text")
+                    or item.get("phrase")
+                    or item.get("key")
+                    or item.get("title")
+                    or ""
+                )
+                count = item.get("value", item.get("count", item.get("freq", 0)))
+            elif isinstance(item, (list, tuple)) and item:
+                phrase = str(item[0] or "")
+                count = item[1] if len(item) > 1 else 0
+            elif isinstance(item, str):
+                phrase = item
+                count = 0
+            try:
+                value = int(str(count).replace(" ", ""))
+            except Exception:
+                value = 0
+            phrase = phrase.strip()
+            if phrase:
+                normalized.append({"phrase": phrase, "count": value})
+        return normalized
+
+    if not table.get("items"):
+        table["items"] = _norm(table_data.get("popular"))
+    if not table.get("related"):
+        table["related"] = _norm(table_data.get("associations") or table_data.get("similar"))
+
+
+def _extract_phrase_from_request(response) -> Optional[str]:
+    """Достаёт исходный searchValue из тела POST."""
+    try:
+        payload = response.request.post_data
+    except Exception:
+        payload = None
+    if not payload:
+        return None
+    try:
+        blob = json.loads(payload)
+        phrase = blob.get("searchValue") or blob.get("query") or ""
+        if isinstance(phrase, str):
+            phrase = fix_mojibake(phrase).strip()
+        else:
+            phrase = ""
+        return phrase or None
+    except Exception:
+        return None
 
 
 class AIMDController:
@@ -169,6 +276,13 @@ class TurboWordstatParser:
             launch_kwargs["args"].append(f"--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE {host}")
 
         context = await self.playwright.chromium.launch_persistent_context(**launch_kwargs)
+        await context.add_init_script(script=WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+        for existing_page in context.pages:
+            await existing_page.add_init_script(script=WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+            try:
+                await existing_page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+            except Exception:
+                pass
         self.context = context
         self.browser = context.browser
 
@@ -177,6 +291,10 @@ class TurboWordstatParser:
         else:
             page = context.pages[0]
         _ensure_wired(page)
+        try:
+            await page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+        except Exception:
+            pass
         await page.goto("https://wordstat.yandex.ru/#!/?region=225", wait_until="domcontentloaded")
         self.pages = [page]
 
@@ -187,6 +305,10 @@ class TurboWordstatParser:
             print(f"[TURBO] Создаю вкладку {i + 1}...")
             page = await self.context.new_page()
             _ensure_wired(page)
+            try:
+                await page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+            except Exception:
+                pass
             existing_pages.append(page)
         self.pages = existing_pages[:self.num_tabs]
         self.page_mapping: Dict[int, Page] = {}
@@ -208,20 +330,38 @@ class TurboWordstatParser:
     async def handle_response(self, response, tab_id: int) -> None:
         if "wordstat/api" not in response.url:
             return
-        try:
-            data = await response.json()
-        except Exception:
+
+        data = await _parse_wordstat_json(response)
+        if not data:
             return
-        phrase = data.get("query", {}).get("text")
+
+        _normalize_wordstat_payload(data)
+
+        phrase = _extract_phrase_from_request(response)
+        if not phrase:
+            items = (data.get("table") or {}).get("items") or []
+            if items:
+                phrase = fix_mojibake(items[0].get("phrase", "")).strip()
         if not phrase:
             return
-        totals = data.get("segments", [{}])[0]
-        freq = totals.get("total", {}).get("value")
+
+        freq: Optional[Any] = data.get("totalValue")
         if freq is None:
+            items = (data.get("table") or {}).get("items") or []
+            if items:
+                freq = items[0].get("count") or items[0].get("value")
+
+        try:
+            frequency = int(str(freq).replace(" ", "")) if freq is not None else None
+        except Exception:
+            frequency = None
+
+        if frequency is None:
             return
+
         self.results[phrase] = {
             "query": phrase,
-            "frequency": freq,
+            "frequency": frequency,
             "timestamp": datetime.utcnow().isoformat(),
             "tab": tab_id,
         }
@@ -235,9 +375,19 @@ class TurboWordstatParser:
                 await page.fill("input.textinput__control", phrase)
                 await page.keyboard.press("Enter")
                 await self.wait_wordstat_ready(page)
-                await asyncio.sleep(self.aimd.get_delay())
-                if phrase in self.results:
-                    results.append(self.results[phrase])
+                captured = False
+                wait_delay = max(self.aimd.get_delay(), 0.05)
+                for _ in range(30):
+                    if phrase in self.results:
+                        results.append(self.results[phrase])
+                        captured = True
+                        break
+                    await asyncio.sleep(wait_delay)
+                if captured:
+                    self.aimd.on_success()
+                else:
+                    print(f"[TURBO] Tab {tab_id}: не получили ответ для «{phrase}»")
+                    self.aimd.on_error()
             except Exception as exc:
                 print(f"[TURBO] Tab {tab_id}: ошибка {exc}")
                 self.aimd.on_error()
@@ -270,7 +420,7 @@ class TurboWordstatParser:
                 VALUES (?, ?, ?, ?, ?, ?)""",
                 (
                     row["query"],
-                    region,
+                    row.get("region", 225),
                     row["frequency"],
                     row["frequency"],
                     "ok",

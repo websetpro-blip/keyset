@@ -6,12 +6,106 @@
 import asyncio
 import json
 import time
+import re
 from playwright.async_api import async_playwright
+from ..utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT, fix_mojibake
 
 # НАСТРОЙКИ
 TABS_COUNT = 10
 DELAY_BETWEEN_TABS = 0.3
 DELAY_BETWEEN_QUERIES = 0.5
+
+_WORDSTAT_ENCODINGS = ("utf-8", "windows-1251", "cp1251", "latin-1")
+
+
+async def _parse_wordstat_json(response):
+    try:
+        raw = await response.body()
+    except Exception:
+        raw = b""
+
+    content_type = ""
+    try:
+        content_type = response.headers.get("content-type", "")
+    except Exception:
+        content_type = ""
+
+    encodings = []
+    match = re.search(r"charset=([^;]+)", content_type or "", flags=re.IGNORECASE)
+    if match:
+        enc = match.group(1).strip().lower()
+        if enc:
+            encodings.append(enc)
+    for enc in _WORDSTAT_ENCODINGS:
+        if enc not in encodings:
+            encodings.append(enc)
+
+    for encoding in encodings:
+        try:
+            text = raw.decode(encoding, errors="strict")
+            return json.loads(text)
+        except Exception:
+            continue
+    return None
+
+
+def _normalize_wordstat_payload(data):
+    table = data.get("table")
+    if not isinstance(table, dict):
+        return
+    table_data = table.get("tableData")
+    if not isinstance(table_data, dict):
+        return
+
+    def _norm(entries):
+        normalized = []
+        for item in entries or []:
+            phrase = ""
+            count = 0
+            if isinstance(item, dict):
+                phrase = (
+                    item.get("text")
+                    or item.get("phrase")
+                    or item.get("key")
+                    or item.get("title")
+                    or ""
+                )
+                count = item.get("value") or item.get("count") or item.get("freq") or 0
+            elif isinstance(item, (list, tuple)) and item:
+                phrase = str(item[0] or "")
+                count = item[1] if len(item) > 1 else 0
+            elif isinstance(item, str):
+                phrase = item
+                count = 0
+            try:
+                value = int(str(count).replace(" ", ""))
+            except Exception:
+                value = 0
+            phrase = phrase.strip()
+            if phrase:
+                normalized.append({"phrase": phrase, "count": value})
+        return normalized
+
+    if not table.get("items"):
+        table["items"] = _norm(table_data.get("popular"))
+    if not table.get("related"):
+        table["related"] = _norm(table_data.get("associations") or table_data.get("similar"))
+
+
+def _extract_phrase_from_request(response):
+    try:
+        payload = response.request.post_data
+    except Exception:
+        payload = None
+    if not payload:
+        return None
+    try:
+        blob = json.loads(payload)
+        phrase = blob.get("searchValue") or blob.get("query") or ""
+        phrase = phrase.strip() if isinstance(phrase, str) else ""
+        return phrase or None
+    except Exception:
+        return None
 
 
 async def parse_wordstat(phrases, log_callback=None):
@@ -50,12 +144,23 @@ async def parse_wordstat(phrases, log_callback=None):
             viewport=None,
             locale='ru-RU'
         )
+        await context.add_init_script(script=WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+        for existing in context.pages:
+            await existing.add_init_script(script=WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+            try:
+                await existing.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+            except Exception:
+                pass
         
         # 2. СОЗДАНИЕ ВКЛАДОК
         log(f"[2/6] Создание {TABS_COUNT} вкладок...")
         
         async def create_tab(index):
             page = await context.new_page()
+            try:
+                await page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+            except Exception:
+                pass
             log(f"  [OK] Вкладка {index+1} создана")
             return page
         
@@ -96,26 +201,35 @@ async def parse_wordstat(phrases, log_callback=None):
         log(f"[4/6] Установка обработчиков API...")
         
         async def handle_response(response):
-            if "/wordstat/api" in response.url and response.status == 200:
-                try:
-                    data = await response.json()
-                    frequency = None
-                    if "data" in data and isinstance(data["data"], dict):
-                        frequency = data["data"].get("totalValue")
-                    elif "totalValue" in data:
-                        frequency = data["totalValue"]
-                    
-                    if frequency is not None:
-                        post_data = response.request.post_data
-                        if post_data:
-                            request_data = json.loads(post_data)
-                            phrase = request_data.get("searchValue", "").strip()
-                            if phrase:
-                                async with results_lock:
-                                    results[phrase] = frequency
-                                log(f"    [+] {phrase}: {frequency:,}")
-                except:
-                    pass
+            if "/wordstat/api" not in response.url or response.status != 200:
+                return
+            data = await _parse_wordstat_json(response)
+            if not data:
+                return
+            _normalize_wordstat_payload(data)
+
+            phrase = fix_mojibake(_extract_phrase_from_request(response) or "")
+            items = (data.get("table") or {}).get("items") or []
+            if not phrase and items:
+                phrase = fix_mojibake(items[0].get("phrase") or "").strip()
+            if not phrase:
+                return
+
+            freq = data.get("totalValue")
+            if freq is None and items:
+                freq = items[0].get("count") or items[0].get("value")
+
+            try:
+                frequency = int(str(freq).replace(" ", "")) if freq is not None else None
+            except Exception:
+                frequency = None
+
+            if frequency is None:
+                return
+
+            async with results_lock:
+                results[phrase] = frequency
+            log(f"    [+] {phrase}: {frequency:,}")
         
         for page in working_pages:
             page.on("response", handle_response)
@@ -164,8 +278,15 @@ async def parse_wordstat(phrases, log_callback=None):
                         await input_field.clear()
                         await input_field.fill(phrase)
                         await input_field.press("Enter")
-                        await asyncio.sleep(DELAY_BETWEEN_QUERIES)
-                
+                        captured = False
+                        for _ in range(30):
+                            if phrase in results:
+                                captured = True
+                                break
+                            await asyncio.sleep(DELAY_BETWEEN_QUERIES)
+                        if not captured:
+                            log(f"  [WARN] [Tab {tab_index+1}] нет ответа для {phrase}")
+              
                 except Exception as e:
                     log(f"  [ERROR] [Tab {tab_index+1}] {phrase}: {e}")
                     return

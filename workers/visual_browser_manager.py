@@ -14,6 +14,7 @@ from enum import Enum
 from playwright.async_api import async_playwright, Page, BrowserContext
 from ..services.proxy_manager import ProxyManager
 from ..utils.proxy import parse_proxy
+from ..utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT
 
 class BrowserStatus(Enum):
     IDLE = "idle"
@@ -119,6 +120,13 @@ class VisualBrowserManager:
                     '--no-default-browser-check'
                 ]
             )
+            await browser_instance.context.add_init_script(script=WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+            for existing_page in browser_instance.context.pages:
+                await existing_page.add_init_script(script=WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+                try:
+                    await existing_page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+                except Exception:
+                    pass
             browser_instance.proxy_obj = proxy_obj
             browser_instance.proxy_id = proxy_obj.id if proxy_obj else proxy_id
             

@@ -1326,7 +1326,7 @@ class AccountsTabExtended(QWidget):
             handle = self._launch_browser_handle(
                 account,
                 target_url="https://wordstat.yandex.ru/?region=225",
-                prefer_cdp=True,
+                prefer_cdp=False,
             )
             if handle:
                 launched += 1

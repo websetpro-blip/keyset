@@ -15,6 +15,7 @@ from playwright.sync_api import sync_playwright
 from ..core.db import SessionLocal
 from ..core.models import Account
 from ..utils.proxy import parse_proxy
+from ..utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT
 from .proxy_manager import Proxy, ProxyManager
 
 BASE_DIR = Path("C:/AI/yandex")
@@ -122,8 +123,10 @@ def for_account(
                 "--start-maximized",
                 "--no-first-run",
                 "--no-default-browser-check",
+                "--disable-infobars",
                 *additional_args,
             ],
+            "ignore_default_args": ["--enable-automation"],
         }
         chrome_path_obj = Path(chrome_exe)
         if chrome_path_obj.exists():
@@ -136,8 +139,19 @@ def for_account(
             playwright.stop()
             manager.release(proxy_obj)
             raise
+        browser.add_init_script(script=WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+        for existing_page in browser.pages:
+            existing_page.add_init_script(script=WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+            try:
+                existing_page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+            except Exception:
+                pass
         page = browser.pages[0] if browser.pages else browser.new_page()
         _wire_logging(page)
+        try:
+            page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+        except Exception:
+            pass
 
         print(
             f"[BF] PW persistent (proxy={'none' if not proxy_obj else proxy_obj.id}) "
@@ -201,9 +215,20 @@ def for_account(
         manager.release(proxy_obj)
         raise RuntimeError(f"Unable to connect to Chrome on port {cdp_port}: {last_error}")
 
-    context = browser.contexts[0] if browser.contexts else browser.new_context()
-    page = context.pages[0] if context.pages else context.new_page()
-    _wire_logging(page)
+        context = browser.contexts[0] if browser.contexts else browser.new_context()
+        context.add_init_script(script=WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+        for existing_page in context.pages:
+            existing_page.add_init_script(script=WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+            try:
+                existing_page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+            except Exception:
+                pass
+        page = context.pages[0] if context.pages else context.new_page()
+        _wire_logging(page)
+        try:
+            page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
+        except Exception:
+            pass
     print(
         f"[BF] CDP attach (proxy={'none' if not proxy_obj else proxy_obj.id}) "
         f"preflight_ip={preflight.get('ip')}"
@@ -321,4 +346,3 @@ def _wire_logging(page: Any) -> None:
         page.on("console", lambda m: print(f"[BF][CONSOLE] {m.type}: {m.text}"))
     except Exception:
         pass
-
