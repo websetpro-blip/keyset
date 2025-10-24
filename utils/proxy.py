@@ -106,3 +106,61 @@ def parse_proxy(proxy_str: Optional[str]) -> Optional[Dict[str, str]]:
     if password:
         result["password"] = password
     return result
+
+
+def parse_proxy_for_playwright(proxy_string: str) -> dict:
+    """
+    Парсинг прокси в формат Playwright.
+
+    Поддерживаемые форматы:
+    - "http://77.73.134.166:8080"
+    - "socks5://user:pass@77.73.134.166:1080"
+    - "77.73.134.166:8080" (без протокола → считать HTTP)
+
+    Args:
+        proxy_string: Строка прокси
+        
+    Returns:
+        dict: {'server': str, 'username': str, 'password': str}
+        None: Если proxy_string пустой
+        
+    Raises:
+        ValueError: Если формат прокси неверный
+        
+    Example:
+        >>> parse_proxy_for_playwright("http://77.73.134.166:8080")
+        {'server': 'http://77.73.134.166:8080'}
+        
+        >>> parse_proxy_for_playwright("socks5://user:pass@host:1080")
+        {'server': 'socks5://host:1080', 'username': 'user', 'password': 'pass'}
+    """
+    if not proxy_string:
+        return None
+
+    import re
+
+    # Парсинг с протоколом и авторизацией
+    match = re.match(
+        r'(?P<protocol>https?|socks5)://'
+        r'(?:(?P<username>[^:]+):(?P<password>[^@]+)@)?'
+        r'(?P<host>[^:]+):(?P<port>\d+)',
+        proxy_string
+    )
+
+    if match:
+        result = {
+            'server': f"{match.group('protocol')}://{match.group('host')}:{match.group('port')}"
+        }
+        if match.group('username'):
+            result['username'] = match.group('username')
+            result['password'] = match.group('password')
+        return result
+
+    # Парсинг без протокола (host:port)
+    match = re.match(r'(?P<host>[^:]+):(?P<port>\d+)', proxy_string)
+    if match:
+        return {
+            'server': f"http://{match.group('host')}:{match.group('port')}"
+        }
+
+    raise ValueError(f"Неверный формат прокси: {proxy_string}")

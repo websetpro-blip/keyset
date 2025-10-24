@@ -405,3 +405,33 @@ def get_profile_ctx(name: str | None) -> dict[str, str | None]:
             "storage_state": storage_file,
             "proxy": account.proxy,
         }
+
+
+def get_account_by_email(email: str) -> dict | None:
+    """
+    Получить аккаунт из БД по email.
+
+    Args:
+        email: Email аккаунта
+    
+    Returns:
+        dict: {'email': str, 'proxy': str, 'profile_path': str, 'status': str}
+        None: Если аккаунт не найден
+    """
+    try:
+        with SessionLocal() as session:
+            stmt = select(Account).where(Account.name == email)
+            acc = session.execute(stmt).scalar_one_or_none()
+
+            if not acc:
+                return None
+
+            return {
+                "email": acc.name,
+                "proxy": acc.proxy,
+                "profile_path": acc.profile_path,
+                "status": acc.status,
+            }
+    except Exception as e:
+        print(f"Ошибка получения аккаунта: {e}")
+        return None
