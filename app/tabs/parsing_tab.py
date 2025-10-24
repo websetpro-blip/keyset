@@ -226,26 +226,38 @@ class ParsingWorker(QThread):
 
         self._log(f"Получено результатов: {len(results)}", "INFO")
 
-        # Преобразовать результаты из Dict[str, int] в формат таблицы
+        # Преобразовать результаты из Dict[str, Dict[str, int]] в формат таблицы
         rows = []
         for phrase in self.phrases:
-            freq = results.get(phrase, 0)
-            status = "OK" if freq > 0 else "No data"
+            freq_data = results.get(phrase, {})
+            ws_freq = freq_data.get("ws", 0)
+            qws_freq = freq_data.get("qws", 0)
+            bws_freq = freq_data.get("bws", 0)
+
+            has_data = ws_freq > 0 or qws_freq > 0 or bws_freq > 0
+            status = "OK" if has_data else "No data"
 
             rows.append(
                 {
                     "phrase": phrase,
-                    "ws": freq if freq > 0 else "",
-                    "qws": "",  # TODO: turbo_parser пока возвращает только базовую частотность
-                    "bws": "",  # TODO: turbo_parser пока возвращает только базовую частотность
+                    "ws": ws_freq if ws_freq > 0 else "",
+                    "qws": qws_freq if qws_freq > 0 else "",
+                    "bws": bws_freq if bws_freq > 0 else "",
                     "status": status,
                 }
             )
 
             # Логировать только первые 5 и последние 5 результатов
             if len(rows) <= 5 or len(rows) > len(self.phrases) - 5:
-                if freq > 0:
-                    self._log(f"  {phrase}: {freq}", "DATA")
+                if has_data:
+                    log_parts = []
+                    if ws_freq > 0:
+                        log_parts.append(f"WS={ws_freq}")
+                    if qws_freq > 0:
+                        log_parts.append(f"\"WS\"={qws_freq}")
+                    if bws_freq > 0:
+                        log_parts.append(f"!WS={bws_freq}")
+                    self._log(f"  {phrase}: {', '.join(log_parts)}", "DATA")
 
         self._log(f"✅ Турбо-парсинг завершён успешно", "SUCCESS")
         return rows
@@ -344,6 +356,14 @@ class ParsingTab(QWidget):
         center_layout.addWidget(self.progress)
         center_layout.addWidget(QLabel("Результаты:"))
         center_layout.addWidget(self.table, 1)
+
+        # Журнал активностей
+        center_layout.addWidget(QLabel("Журнал активностей:"))
+        self.log_text = QTextEdit()
+        self.log_text.setReadOnly(True)
+        self.log_text.setMaximumHeight(120)
+        self.log_text.setStyleSheet("QTextEdit { font-family: 'Consolas', 'Courier New', monospace; font-size: 9pt; }")
+        center_layout.addWidget(self.log_text)
 
         splitter.addWidget(left)
         splitter.addWidget(center)
@@ -497,6 +517,7 @@ class ParsingTab(QWidget):
         )
         self._worker.tick.connect(self._on_worker_tick)
         self._worker.finished.connect(self._on_worker_finished)
+        self._worker.log_signal.connect(self._append_log)
         self._worker.start()
 
     def _on_stop_clicked(self) -> None:
@@ -509,6 +530,13 @@ class ParsingTab(QWidget):
 
     def _on_worker_tick(self, data: dict) -> None:
         self.progress.setValue(data.get("progress", 0))
+
+    def _append_log(self, message: str) -> None:
+        """Добавить лог в журнал активностей."""
+        self.log_text.append(message)
+        # Прокрутить вниз к последнему сообщению
+        scrollbar = self.log_text.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
     def _on_worker_finished(self, rows: list[dict]) -> None:
         self._worker = None
@@ -546,6 +574,18 @@ class ParsingTab(QWidget):
                     }
                 )
             self._keys_panel.load_groups(groups)
+
+        # Сохранить состояние сессии с результатами
+        partial_results = {
+            record.get("phrase", ""): {
+                "ws": record.get("ws", 0),
+                "qws": record.get("qws", 0),
+                "bws": record.get("bws", 0),
+                "status": record.get("status", ""),
+            }
+            for record in rows
+        }
+        self.save_session_state(partial_results=partial_results)
 
     def _on_export_clicked(self) -> None:
         filename, _ = QFileDialog.getSaveFileName(self, "Экспорт в CSV", "keyset_export.csv", "CSV files (*.csv)")
