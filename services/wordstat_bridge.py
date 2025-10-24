@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import random
 from importlib import import_module
 from typing import Any
 
@@ -36,18 +35,17 @@ def collect_frequency(
         if payload is not None:
             return payload
 
-    # fallback — synth data so UI keeps working
+    # fallback — return empty results instead of synthetic data
+    # Демо-данные удалены - теперь возвращаем пустые результаты
     results: list[dict] = []
     for phrase in phrases:
-        seed = abs(hash(phrase)) % 9_999
-        base = max(10, seed)
         results.append(
             {
                 "phrase": phrase,
-                "ws": base,
-                "qws": int(base * 0.65),
-                "bws": int(base * 0.35),
-                "status": "OK",
+                "ws": "",
+                "qws": "",
+                "bws": "",
+                "status": "No parser available",
             }
         )
     return results

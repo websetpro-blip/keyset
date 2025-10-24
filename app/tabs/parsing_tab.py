@@ -218,6 +218,7 @@ class ParsingWorker(QThread):
                     phrases=self.phrases,
                     headless=False,
                     proxy_uri=proxy_uri,
+                    modes=modes_active,  # Передаем режимы парсинга
                 )
             )
         except Exception as e:
