@@ -9,6 +9,14 @@ from pathlib import Path
 from playwright.async_api import async_playwright, expect
 from PySide6.QtCore import QObject, Signal
 
+try:
+    from ..utils.proxy import parse_proxy  # type: ignore
+except ImportError:  # pragma: no cover - fallback when running as script
+    try:
+        from utils.proxy import parse_proxy  # type: ignore
+    except ImportError:  # pragma: no cover
+        parse_proxy = None
+
 
 class YandexSmartLogin(QObject):
     """Умный автологин с обработкой всех вариантов форм Яндекса"""
@@ -63,35 +71,30 @@ class YandexSmartLogin(QObject):
                 # Правильная обработка прокси через Playwright
                 proxy_config = None
                 if proxy:
-                    self.status_update.emit(f"[PROXY] Настройка прокси...")
-                    # Парсим формат из файлов: IP:PORT@USER:PASS
-                    # Пример: 213.139.223.16:9739@Nuj2eh:M6FEcS
-                    if "@" in proxy:
-                        # Разделяем на серверную часть и авторизационную
-                        server_part, auth_part = proxy.split("@", 1)
-                        
-                        # Парсим серверную часть (IP:PORT)
-                        if ":" in server_part:
-                            server_parts = server_part.rsplit(":", 1)  # Разбиваем с конца для поддержки IPv6
-                            host = server_parts[0]
-                            port = server_parts[1]
-                        else:
-                            host = server_part
-                            port = "8080"  # Порт по умолчанию
-                        
-                        # Парсим авторизационную часть (USER:PASS)
-                        if ":" in auth_part:
-                            username, password = auth_part.split(":", 1)
-                        else:
-                            username = auth_part
-                            password = ""
-                        
+                    self.status_update.emit("[PROXY] Настройка прокси...")
+                    parsed_proxy = None
+                    if callable(parse_proxy):
+                        try:
+                            parsed_proxy = parse_proxy(proxy)
+                        except Exception as exc:  # pragma: no cover - diagnostic only
+                            self.status_update.emit(f"[WARNING] Ошибка разбора прокси: {exc}")
+                    if parsed_proxy and parsed_proxy.get("server"):
                         proxy_config = {
-                            "server": f"http://{host}:{port}",
-                            "username": username,
-                            "password": password
+                            "server": parsed_proxy["server"],
                         }
-                        self.status_update.emit(f"[OK] Прокси настроен: {host}:{port} (user: {username})")
+                        if parsed_proxy.get("username"):
+                            proxy_config["username"] = parsed_proxy["username"]
+                        if parsed_proxy.get("password"):
+                            proxy_config["password"] = parsed_proxy["password"]
+                        server_label = parsed_proxy["server"]
+                        user_label = parsed_proxy.get("username")
+                        if user_label:
+                            self.status_update.emit(f"[OK] Прокси настроен: {server_label} (user: {user_label})")
+                        else:
+                            self.status_update.emit(f"[OK] Прокси настроен: {server_label}")
+                    else:
+                        self.status_update.emit("[WARNING] Не удалось распознать прокси — запуск без прокси")
+                        proxy_config = None
                 
                 # Запускаем Chrome с persistent context
                 # Playwright сам обработает прокси авторизацию!

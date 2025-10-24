@@ -68,10 +68,7 @@ class ChromeLauncherDirectParser:
         ]
 
         proxy_scheme = "http" if proxy_data["is_http"] else "socks5"
-        if proxy_data.get("username"):
-            proxy_flag = f"{proxy_scheme}://{proxy_data['username']}:{proxy_data.get('password','')}@{proxy_data['server']}:{proxy_data['port']}"
-        else:
-            proxy_flag = f"{proxy_scheme}://{proxy_data['server']}:{proxy_data['port']}"
+        proxy_flag = f"{proxy_scheme}://{proxy_data['server']}:{proxy_data['port']}"
         args.append(f"--proxy-server={proxy_flag}")
         args.append(start_url)
 

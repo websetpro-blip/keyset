@@ -172,9 +172,21 @@ class AutoLoginThread(QThread):
         if secret_answer:
             smart_login.set_secret_answer(secret_answer)
 
-        proxy_to_use = account_info.get("proxy", None)
+        proxy_to_use = (account_info.get("proxy") or getattr(self.account, "proxy", None) or "").strip()
         if proxy_to_use:
-            self.status_signal.emit(f"[INFO] Используется прокси: {proxy_to_use.split('@')[0]}@***")
+            parsed_proxy = parse_proxy(proxy_to_use)
+            if parsed_proxy and parsed_proxy.get("server"):
+                server_label = parsed_proxy["server"]
+                user_label = parsed_proxy.get("username")
+                if user_label:
+                    self.status_signal.emit(f"[INFO] Используется прокси: {server_label} (user: {user_label})")
+                else:
+                    self.status_signal.emit(f"[INFO] Используется прокси: {server_label}")
+            else:
+                self.status_signal.emit("[WARNING] Формат прокси не распознан, пробую использовать как есть")
+        else:
+            proxy_to_use = None
+            self.status_signal.emit("[WARNING] Прокси для аккаунта не указан — запуск без прокси")
 
         self.status_signal.emit(f"[SMART] Запускаю автологин...")
         success = await smart_login.login(
