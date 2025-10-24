@@ -6,16 +6,32 @@ import re
 import asyncio
 import json
 from pathlib import Path
+from datetime import datetime
 from playwright.async_api import async_playwright, expect
 from PySide6.QtCore import QObject, Signal
 
 try:
-    from ..utils.proxy import parse_proxy  # type: ignore
+    from ..utils.proxy import parse_proxy_for_playwright  # type: ignore
 except ImportError:  # pragma: no cover - fallback when running as script
     try:
-        from utils.proxy import parse_proxy  # type: ignore
+        from utils.proxy import parse_proxy_for_playwright  # type: ignore
     except ImportError:  # pragma: no cover
-        parse_proxy = None
+        parse_proxy_for_playwright = None
+
+LOG_DIR = Path(__file__).resolve().parents[1] / "logs"
+LOGIN_LOG_FILE = LOG_DIR / "autologin_debug.log"
+
+
+def _log_debug(message: str) -> None:
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        if not LOGIN_LOG_FILE.exists():
+            LOGIN_LOG_FILE.touch()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with LOGIN_LOG_FILE.open("a", encoding="utf-8") as fh:
+            fh.write(f"[{timestamp}] {message}\n")
+    except Exception:
+        pass
 
 
 class YandexSmartLogin(QObject):
@@ -42,6 +58,7 @@ class YandexSmartLogin(QObject):
         Обрабатывает 3 типа форм: новая (2 шага), легаси, challenge
         """
         try:
+            _log_debug(f"login start account={account_name} profile={profile_path} proxy={proxy}")
             self.status_update.emit(f"[START] Запуск автологина для {account_name}...")
             self.progress_update.emit(10)
             
@@ -72,28 +89,26 @@ class YandexSmartLogin(QObject):
                 proxy_config = None
                 if proxy:
                     self.status_update.emit("[PROXY] Настройка прокси...")
-                    parsed_proxy = None
-                    if callable(parse_proxy):
+                    _log_debug(f"raw proxy value received: {proxy}")
+                    if callable(parse_proxy_for_playwright):
                         try:
-                            parsed_proxy = parse_proxy(proxy)
+                            proxy_config = parse_proxy_for_playwright(proxy)
                         except Exception as exc:  # pragma: no cover - diagnostic only
+                            proxy_config = None
                             self.status_update.emit(f"[WARNING] Ошибка разбора прокси: {exc}")
-                    if parsed_proxy and parsed_proxy.get("server"):
-                        proxy_config = {
-                            "server": parsed_proxy["server"],
-                        }
-                        if parsed_proxy.get("username"):
-                            proxy_config["username"] = parsed_proxy["username"]
-                        if parsed_proxy.get("password"):
-                            proxy_config["password"] = parsed_proxy["password"]
-                        server_label = parsed_proxy["server"]
-                        user_label = parsed_proxy.get("username")
+                            _log_debug(f"proxy parse error: {exc}")
+                    if proxy_config:
+                        server_label = proxy_config.get("server")
+                        user_label = proxy_config.get("username")
                         if user_label:
                             self.status_update.emit(f"[OK] Прокси настроен: {server_label} (user: {user_label})")
+                            _log_debug(f"proxy configured server={server_label} user={user_label}")
                         else:
                             self.status_update.emit(f"[OK] Прокси настроен: {server_label}")
+                            _log_debug(f"proxy configured server={server_label}")
                     else:
                         self.status_update.emit("[WARNING] Не удалось распознать прокси — запуск без прокси")
+                        _log_debug("proxy parsing failed; running without proxy")
                         proxy_config = None
                 
                 # Запускаем Chrome с persistent context
@@ -116,6 +131,7 @@ class YandexSmartLogin(QObject):
                     ],
                     ignore_default_args=["--enable-automation"]
                 )
+                _log_debug(f"launch_persistent_context completed for {account_name} proxy={proxy_config}")
                 self.status_update.emit(f"[CONTEXT] Контекст создан, браузер запущен")
                 
                 # Используем существующую страницу или создаем новую
