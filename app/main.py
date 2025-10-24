@@ -89,7 +89,7 @@ class AccountDialog(QDialog):
         proxy = self.proxy_edit.text().strip() or None
         notes = self.notes_edit.toPlainText().strip() or None
 
-        accounts_file = Path("C:/AI/yandex/configs/accounts.json")
+        accounts_file = ACCOUNTS_CONFIG_PATH
         accounts_file.parent.mkdir(parents=True, exist_ok=True)
         accounts: list[dict[str, Any]] = []
         if accounts_file.exists():
@@ -321,3 +321,5 @@ def main() -> None:
 
 
 __all__ = ["AccountDialog", "MainWindow", "main"]
+WORKSPACE_ROOT = Path(r"C:/AI/yandex-local")
+ACCOUNTS_CONFIG_PATH = WORKSPACE_ROOT / "configs" / "accounts.json"

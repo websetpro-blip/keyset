@@ -8,7 +8,10 @@ import asyncio
 import json
 from typing import Any
 
-from ..core.db import get_db_connection
+try:
+    from ..core.db import get_db_connection
+except ImportError:
+    from core.db import get_db_connection
 
 
 async def forecast_batch_direct(

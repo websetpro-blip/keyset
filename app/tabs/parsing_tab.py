@@ -27,8 +27,12 @@ from PySide6.QtWidgets import (
 
 from ..widgets.geo_tree import GeoTree
 from ..keys_panel import KeysPanel
-from ...services.accounts import list_profiles, get_profile_ctx
-from ...services.wordstat_bridge import collect_frequency, collect_depth, collect_forecast
+try:
+    from ...services.accounts import list_profiles, get_profile_ctx
+    from ...services.wordstat_bridge import collect_frequency, collect_depth, collect_forecast
+except ImportError:
+    from services.accounts import list_profiles, get_profile_ctx
+    from services.wordstat_bridge import collect_frequency, collect_depth, collect_forecast
 
 
 class ParsingWorker(QThread):

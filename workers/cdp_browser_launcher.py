@@ -48,7 +48,6 @@ class CDPBrowserLauncher:
                 use_cdp=True,
                 cdp_port=int(descriptor.get("port", 0)),
                 profile_override=descriptor.get("profile"),
-                args=["https://wordstat.yandex.ru/?region=225"],
             )
         except Exception as exc:
             print(f"[{descriptor['name']}] ERROR: {exc}")

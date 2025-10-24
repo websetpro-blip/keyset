@@ -4,25 +4,37 @@ import base64
 import json
 import os
 import shutil
+import socket
 import subprocess
 import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, List
 
 from playwright.sync_api import sync_playwright
 
-from ..core.db import SessionLocal
-from ..core.models import Account
-from ..utils.proxy import parse_proxy
-from ..utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT
-from .proxy_manager import Proxy, ProxyManager
+try:
+    from ..core.db import SessionLocal
+    from ..core.models import Account
+    from ..utils.proxy import parse_proxy
+    from ..utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT
+    from .proxy_manager import Proxy, ProxyManager
+    from .chrome_launcher import ChromeLauncher
+except ImportError:
+    from core.db import SessionLocal
+    from core.models import Account
+    from utils.proxy import parse_proxy
+    from utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT
+    from .proxy_manager import Proxy, ProxyManager
+    from .chrome_launcher import ChromeLauncher
 
-BASE_DIR = Path("C:/AI/yandex")
+BASE_DIR = ChromeLauncher.BASE_DIR
 RUNTIME_DIR = BASE_DIR / "runtime"
 PROXY_EXT_DIR = RUNTIME_DIR / "proxy_extensions"
+BROWSER_SETTINGS_PATH = BASE_DIR / "config" / "browser_settings.json"
+_BROWSER_SETTINGS_CACHE: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -36,6 +48,91 @@ class BrowserContextHandle:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+def _load_browser_settings() -> Dict[str, Any]:
+    global _BROWSER_SETTINGS_CACHE
+    if _BROWSER_SETTINGS_CACHE is None:
+        try:
+            raw = BROWSER_SETTINGS_PATH.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            _BROWSER_SETTINGS_CACHE = {}
+        else:
+            try:
+                _BROWSER_SETTINGS_CACHE = json.loads(raw)
+            except json.JSONDecodeError:
+                _BROWSER_SETTINGS_CACHE = {}
+    return _BROWSER_SETTINGS_CACHE or {}
+
+
+def _browser_config_accounts() -> list[Dict[str, Any]]:
+    settings = _load_browser_settings()
+    accounts = settings.get("accounts")
+    return accounts if isinstance(accounts, list) else []
+
+
+def _browser_config_args() -> list[str]:
+    settings = _load_browser_settings()
+    args = settings.get("browser_args")
+    if isinstance(args, list):
+        return [str(item) for item in args if isinstance(item, str)]
+    return []
+
+
+def _config_entry_for_account(account_name: str) -> Optional[Dict[str, Any]]:
+    for entry in _browser_config_accounts():
+        if entry.get("name") == account_name:
+            return entry
+    return None
+
+def _mask_proxy_uri(uri: Optional[str]) -> Optional[str]:
+    if not uri:
+        return uri
+    working = uri
+    scheme = ''
+    if '://' in working:
+        scheme, working = working.split('://', 1)
+    if '@' not in working:
+        return uri
+    creds, host = working.split('@', 1)
+    user = creds.split(':', 1)[0] if ':' in creds else creds
+    prefix = f"{scheme}://" if scheme else ''
+    return f"{prefix}{user}:***@{host}"
+
+
+def _strip_proxy_credentials(uri: Optional[str]) -> Optional[str]:
+    if not uri:
+        return uri
+    if '://' not in uri:
+        return uri.split('@', 1)[-1]
+    scheme, rest = uri.split('://', 1)
+    host_part = rest.split('@', 1)[-1]
+    return f"{scheme}://{host_part}"
+
+
+
+def _iter_candidate_ports(preferred: Optional[int] = None, *, start: int = 9222, limit: int = 50):
+    if preferred:
+        yield preferred
+    port = start
+    attempts = 0
+    while attempts < limit:
+        if port != preferred:
+            yield port
+        port += 1
+        attempts += 1
+
+
+def _pick_available_port(preferred: Optional[int] = None) -> int:
+    for candidate in _iter_candidate_ports(preferred):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind(("127.0.0.1", candidate))
+            except OSError:
+                continue
+        return candidate
+    raise RuntimeError("Unable to allocate free CDP port")
+
+
 def _resolve_account(account_id: int) -> Account:
     with SessionLocal() as session:
         account = session.get(Account, account_id)
@@ -45,13 +142,7 @@ def _resolve_account(account_id: int) -> Account:
 
 
 def _normalize_profile_path(raw_path: Optional[str], account_name: str) -> Path:
-    if raw_path:
-        path = Path(str(raw_path).strip())
-    else:
-        path = Path(".profiles") / account_name
-    if path.is_absolute():
-        return path
-    return BASE_DIR / path
+    return ChromeLauncher._normalise_profile_path(raw_path, account_name)
 
 
 def _prepare_proxy(
@@ -76,10 +167,11 @@ def for_account(
     headless: bool = False,
     use_cdp: bool = False,
     chrome_path: Optional[str] = None,
-    cdp_port: int = 9222,
+    cdp_port: Optional[int] = None,
     args: Optional[list[str]] = None,
     geo: Optional[str] = None,
     profile_override: Optional[str] = None,
+    target_url: Optional[str] = None,
 ) -> BrowserContextHandle:
     _clear_system_proxy_env()
 
@@ -89,15 +181,54 @@ def for_account(
 
     manager = ProxyManager.instance()
     proxy_obj, proxy_kwargs = _prepare_proxy(account, manager, geo=geo)
+    if proxy_obj:
+        print(f"[BF] Proxy manager entry for {account.name}: {proxy_obj.display_label()} (auth={'yes' if proxy_obj.has_auth else 'no'})")
+    elif proxy_kwargs:
+        label = proxy_kwargs.get('server', '')
+        if proxy_kwargs.get('username'):
+            label = f"{label} (login={proxy_kwargs['username']})"
+        print(f"[BF] Proxy config entry for {account.name}: {label}")
+    else:
+        print(f"[BF] Proxy disabled for {account.name}")
+
+    resolved_proxy_uri: Optional[str] = None
+
+    config_entry = _config_entry_for_account(account.name)
+    if not proxy_obj and not proxy_kwargs and config_entry:
+        config_proxy = config_entry.get("proxy")
+        if isinstance(config_proxy, str) and config_proxy.strip():
+            parsed_proxy = parse_proxy(config_proxy.strip())
+            if parsed_proxy:
+                proxy_kwargs = parsed_proxy
 
     chrome_exe = chrome_path or r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
     additional_args = list(args or [])
+    for extra_arg in _browser_config_args():
+        if extra_arg not in additional_args:
+            additional_args.append(extra_arg)
+
     proxy_requires_auth = False
     if proxy_obj and proxy_obj.has_auth:
         proxy_requires_auth = True
+        resolved_proxy_uri = proxy_obj.uri(include_credentials=True)
     elif proxy_kwargs and proxy_kwargs.get("username"):
         proxy_requires_auth = True
+    if resolved_proxy_uri is None and proxy_kwargs:
+        server = proxy_kwargs.get("server", "")
+        scheme, _, host_port = server.partition("://")
+        if not host_port:
+            host_port = scheme
+            scheme = "http"
+        username = proxy_kwargs.get("username")
+        password = proxy_kwargs.get("password", "")
+        if username:
+            resolved_proxy_uri = f"{scheme}://{username}:{password}@{host_port}"
+        elif server:
+            resolved_proxy_uri = f"{scheme}://{host_port}"
+
+    if resolved_proxy_uri:
+        print(f"[BF] Proxy URI for {account.name}: {_mask_proxy_uri(resolved_proxy_uri)}")
 
     proxy_server_for_resolver: Optional[str] = None
     if proxy_obj and proxy_obj.type.lower().startswith("socks"):
@@ -116,7 +247,7 @@ def for_account(
     proxy_extension_dir: Optional[Path] = None
     if use_cdp and proxy_requires_auth:
         try:
-            proxy_extension_dir = _ensure_proxy_extension(proxy_obj)
+            proxy_extension_dir = _ensure_proxy_extension(proxy_obj, proxy_kwargs)
         except Exception as exc:
             print(f"[BF] Proxy extension error: {exc}")
             proxy_extension_dir = None
@@ -162,6 +293,14 @@ def for_account(
             page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
         except Exception:
             pass
+        if target_url:
+            try:
+                page.goto(target_url, wait_until="networkidle")
+            except Exception:
+                try:
+                    page.goto(target_url)
+                except Exception:
+                    pass
 
         print(
             f"[BF] PW persistent (proxy={'none' if not proxy_obj else proxy_obj.id}) "
@@ -190,9 +329,22 @@ def for_account(
             },
         )
 
+    resolved_port = cdp_port
+    if config_entry and resolved_port is None:
+        cfg_port = config_entry.get("cdp_port")
+        if isinstance(cfg_port, int):
+            resolved_port = cfg_port
+        elif isinstance(cfg_port, str) and cfg_port.isdigit():
+            resolved_port = int(cfg_port)
+    try:
+        resolved_port = _pick_available_port(resolved_port)
+    except RuntimeError:
+        manager.release(proxy_obj)
+        raise
+
     cmd = [
         chrome_exe,
-        f"--remote-debugging-port={cdp_port}",
+        f"--remote-debugging-port={resolved_port}",
         f"--user-data-dir={profile_dir}",
         "--disable-infobars",
         "--no-first-run",
@@ -202,19 +354,40 @@ def for_account(
     ]
 
     if proxy_extension_dir:
+        print(f"[BF] Proxy auth extension enabled: {proxy_extension_dir}")
         ext_path = str(proxy_extension_dir).replace("\\", "/")
         cmd.append(f'--disable-extensions-except="{ext_path}"')
         cmd.append(f'--load-extension="{ext_path}"')
     else:
         cmd.append("--disable-extensions")
 
-    if proxy_obj:
+    proxy_flag = None
+    if resolved_proxy_uri:
+        proxy_flag = _strip_proxy_credentials(resolved_proxy_uri)
+    elif proxy_obj:
         scheme, _, host_port = proxy_obj.server.partition("://")
-        cmd.append(f'--proxy-server={scheme}://{host_port}')
+        proxy_flag = f"{scheme}://{host_port}"
     elif proxy_kwargs:
         server = proxy_kwargs.get("server")
         if server:
-            cmd.append(f'--proxy-server={server}')
+            proxy_flag = _strip_proxy_credentials(server)
+    if proxy_flag:
+        cmd.append(f'--proxy-server={proxy_flag}')
+        print(f"[BF] Chrome proxy flag for {account.name}: {_mask_proxy_uri(proxy_flag)}")
+    else:
+        print(f"[BF] Chrome proxy flag for {account.name}: none")
+
+    if target_url:
+        cmd.append(target_url)
+
+    safe_cmd: List[str] = []
+    for arg in cmd:
+        if arg.startswith('--proxy-server='):
+            value = arg.split('=', 1)[1]
+            safe_cmd.append(f"--proxy-server={_mask_proxy_uri(value)}")
+        else:
+            safe_cmd.append(arg)
+    print(f"[BF] Launch Chrome command for {account.name}: {' '.join(safe_cmd)}")
 
     process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -224,7 +397,7 @@ def for_account(
     last_error: Optional[Exception] = None
     while time.time() < deadline:
         try:
-            browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{cdp_port}")
+            browser = playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{resolved_port}")
             break
         except Exception as exc:
             last_error = exc
@@ -249,6 +422,24 @@ def for_account(
         page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
     except Exception:
         pass
+    if target_url:
+        try:
+            navigated = False
+            try:
+                current_url = page.url
+            except Exception:
+                current_url = ""
+            if not current_url or current_url in {"about:blank", "chrome://newtab/"}:
+                page.goto(target_url, wait_until="networkidle")
+                navigated = True
+            if not navigated:
+                new_page = context.new_page()
+                new_page.goto(target_url, wait_until="networkidle")
+        except Exception:
+            try:
+                page.goto(target_url)
+            except Exception:
+                pass
     print(
         f"[BF] CDP attach (proxy={'none' if not proxy_obj else proxy_obj.id}) "
         f"preflight_ip={preflight.get('ip')}"
@@ -270,11 +461,15 @@ def for_account(
 
     metadata: Dict[str, Any] = {
         "profile_dir": str(profile_dir),
-        "cdp_port": cdp_port,
+        "cdp_port": resolved_port,
         "preflight": preflight,
     }
+    if resolved_proxy_uri:
+        metadata["proxy_uri"] = resolved_proxy_uri
     if proxy_extension_dir:
         metadata["proxy_extension_dir"] = str(proxy_extension_dir)
+    if target_url:
+        metadata["target_url"] = target_url
 
     return BrowserContextHandle(
         kind="cdp",
@@ -292,10 +487,11 @@ def start_for_account(
     *,
     headless: bool = False,
     use_cdp: bool = False,
-    cdp_port: int = 9222,
+    cdp_port: Optional[int] = None,
     args: Optional[list[str]] = None,
     geo: Optional[str] = None,
     profile_override: Optional[str] = None,
+    target_url: Optional[str] = None,
 ) -> BrowserContextHandle:
     """Convenience alias that mirrors the signature from older code paths."""
     return for_account(
@@ -306,6 +502,7 @@ def start_for_account(
         args=args,
         geo=geo,
         profile_override=profile_override,
+        target_url=target_url,
     )
 
 
@@ -374,28 +571,50 @@ def _wire_logging(page: Any) -> None:
         pass
 
 
-def _ensure_proxy_extension(proxy: Optional[Proxy]) -> Optional[Path]:
-    if proxy is None or not proxy.has_auth:
+def _ensure_proxy_extension(
+    proxy: Optional[Proxy] = None,
+    proxy_kwargs: Optional[Dict[str, str]] = None,
+) -> Optional[Path]:
+    username_value: Optional[str] = None
+    password_value: Optional[str] = None
+    server_value: Optional[str] = None
+    proxy_id: str = "proxy"
+
+    if proxy and proxy.has_auth:
+        username_value = proxy.username or ""
+        password_value = proxy.password or ""
+        server_value = proxy.server
+        proxy_id = proxy.id
+    elif proxy_kwargs and proxy_kwargs.get("username"):
+        username_value = proxy_kwargs.get("username") or ""
+        password_value = proxy_kwargs.get("password") or ""
+        server_value = proxy_kwargs.get("server")
+        proxy_id = f"cfg_{int(time.time() * 1000)}"
+    else:
+        return None
+
+    if not server_value:
         return None
 
     try:
-        scheme, _, host_port = proxy.server.partition("://")
+        scheme, _, host_port = server_value.partition("://")
+        if not host_port:
+            host_port = scheme
+            scheme = "http"
         host, _, port = host_port.partition(":")
         port = port or "80"
     except Exception:
         return None
 
     PROXY_EXT_DIR.mkdir(parents=True, exist_ok=True)
-    ext_dir = PROXY_EXT_DIR / f"{proxy.id}_{int(time.time() * 1000)}"
+    ext_dir = PROXY_EXT_DIR / f"{proxy_id}_{int(time.time() * 1000)}"
     ext_dir.mkdir(parents=True, exist_ok=True)
 
     manifest = {
         "manifest_version": 3,
-        "name": f"ProxyAuth {proxy.id}",
+        "name": f"ProxyAuth {proxy_id}",
         "version": "1.0",
         "permissions": [
-            "proxy",
-            "storage",
             "webRequest",
             "webRequestAuthProvider",
             "webRequestBlocking",
@@ -408,30 +627,10 @@ def _ensure_proxy_extension(proxy: Optional[Proxy]) -> Optional[Path]:
     manifest_path = ext_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    username = json.dumps(proxy.username or "")
-    password = json.dumps(proxy.password or "")
+    username = json.dumps(username_value or "")
+    password = json.dumps(password_value or "")
 
     background = f"""
-const proxyConfig = {{
-  mode: "fixed_servers",
-  rules: {{
-    singleProxy: {{
-      scheme: "{scheme}",
-      host: "{host}",
-      port: parseInt("{port}", 10)
-    }},
-    bypassList: []
-  }}
-}};
-
-function configureProxy() {{
-  chrome.proxy.settings.set({{ value: proxyConfig, scope: "regular" }}, () => chrome.runtime.lastError);
-}}
-
-chrome.runtime.onInstalled.addListener(configureProxy);
-chrome.runtime.onStartup.addListener(configureProxy);
-configureProxy();
-
 chrome.webRequest.onAuthRequired.addListener(
   (details) => {{
     return {{

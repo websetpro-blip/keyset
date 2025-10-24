@@ -6,8 +6,12 @@ from typing import Iterable
 
 from sqlalchemy import select, func
 
-from ..core.db import SessionLocal, get_db_connection
-from ..core.models import FrequencyResult
+try:
+    from ..core.db import SessionLocal, get_db_connection
+    from ..core.models import FrequencyResult
+except ImportError:
+    from core.db import SessionLocal, get_db_connection
+    from core.models import FrequencyResult
 
 QUEUE_STATUSES = ("queued", "running", "ok", "error")
 

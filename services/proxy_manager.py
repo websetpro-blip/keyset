@@ -10,7 +10,10 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
-from ..utils.proxy import parse_proxy
+try:
+    from ..utils.proxy import parse_proxy
+except ImportError:
+    from utils.proxy import parse_proxy
 
 
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "proxies.json"

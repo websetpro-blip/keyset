@@ -16,13 +16,22 @@ from urllib.parse import quote
 
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
 
-from ..utils.proxy import parse_proxy
-from ..utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT, fix_mojibake
-from ..core.db import SessionLocal
-from ..core.models import Account
-from ..services.proxy_manager import ProxyManager, proxy_preflight, Proxy
-from .visual_browser_manager import VisualBrowserManager, BrowserStatus
-from .auto_auth_handler import AutoAuthHandler
+try:
+    from ..utils.proxy import parse_proxy
+    from ..utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT, fix_mojibake
+    from ..core.db import SessionLocal
+    from ..core.models import Account
+    from ..services.proxy_manager import ProxyManager, proxy_preflight, Proxy
+    from .visual_browser_manager import VisualBrowserManager, BrowserStatus
+    from .auto_auth_handler import AutoAuthHandler
+except ImportError:
+    from utils.proxy import parse_proxy
+    from utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT, fix_mojibake
+    from core.db import SessionLocal
+    from core.models import Account
+    from services.proxy_manager import ProxyManager, proxy_preflight, Proxy
+    from .visual_browser_manager import VisualBrowserManager, BrowserStatus
+    from .auto_auth_handler import AutoAuthHandler
 
 
 def _wire_logging(page: Page) -> None:

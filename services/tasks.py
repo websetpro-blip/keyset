@@ -5,8 +5,12 @@ from typing import Any
 
 from sqlalchemy import select
 
-from ..core.db import SessionLocal
-from ..core.models import Account, Task
+try:
+    from ..core.db import SessionLocal
+    from ..core.models import Account, Task
+except ImportError:
+    from core.db import SessionLocal
+    from core.models import Account, Task
 
 TASK_STATUS_LABELS = {
     'queued': 'В очереди',

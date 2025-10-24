@@ -32,9 +32,7 @@ from PySide6.QtWidgets import (
 from ..services import accounts as account_service
 from ..services.accounts import test_proxy, get_cookies_status, autologin_account
 from ..services.chrome_launcher import ChromeLauncher
-from ..services.chrome_launcher_directparser import ChromeLauncherDirectParser
 from ..services.cdp_connector import CDPConnector
-from ..services.cdp_connector_directparser import CDPConnectorDirectParser
 from ..services.captcha import CaptchaService
 from ..workers.visual_browser_manager import VisualBrowserManager, BrowserStatus
 from ..utils.proxy import parse_proxy
@@ -120,20 +118,19 @@ class AutoLoginThread(QThread):
         import json
         from pathlib import Path
 
-        profile_path_raw = self.account.profile_path
+        profile_path = self.account.profile_path
 
         # ⚠️ ПРОВЕРКА: Профиль ДОЛжеН быть из БД!
-        if not profile_path_raw:
+        if not profile_path:
             self.status_signal.emit(f"[ERROR] У аккаунта {self.account.name} НЕТ profile_path в БД!")
             self.finished_signal.emit(False, "Профиль не указан в БД")
             return
 
-        profile_path_obj = ChromeLauncher._normalise_profile_path(profile_path_raw, self.account.name)
-        profile_path = profile_path_obj.as_posix()
-        if profile_path != (profile_path_raw or ""):
-            self.status_signal.emit(f"[INFO] Путь профиля преобразован: {profile_path}")
-        else:
-            self.status_signal.emit(f"[OK] Профиль из БД: {profile_path}")
+        self.status_signal.emit(f"[OK] Профиль РёР· Р'Р]: {profile_path}")
+
+        if not profile_path.startswith("C:"):
+            profile_path = f"C:/AI/yandex-local/{profile_path}"
+            self.status_signal.emit(f"[INFO] Путь преобразован: {profile_path}")
 
         accounts_file = Path("C:/AI/yandex-local/configs/accounts.json")
         if not accounts_file.exists():
@@ -1233,46 +1230,41 @@ class AccountsTabExtended(QWidget):
 
 
     def login_selected(self):
-        """Запуск браузера с прокси по схеме DirectParser."""
+        """Открыть Chrome для ручного логина с CDP портом."""
         selected_rows = self._selected_rows()
         if not selected_rows:
             QMessageBox.warning(self, "Внимание", "Выберите аккаунты для логина")
             return
 
-        used_ports: set[int] = set()
+        used_ports = set()
         for row in selected_rows:
             if row >= len(self._accounts):
                 continue
             account = self._accounts[row]
             proxy_data = parse_proxy(account.proxy)
-            if not proxy_data or not proxy_data.get("server"):
-                self.log_action(f"[{account.name}] Прокси не настроен")
-                continue
-
-            proxy_server = proxy_data.get("server", "")
-            if "://" in proxy_server:
-                proxy_server = proxy_server.split("://", 1)[1]
-
             port_seed = 9222 + (hash(account.name) % 100)
             port = self._allocate_cdp_port(port_seed, used_ports)
 
             try:
-                ChromeLauncherDirectParser.launch(
-                    account_name=account.name,
-                    profile_path=account.profile_path,
-                    cdp_port=port,
-                    proxy_server=proxy_server,
-                    proxy_username=proxy_data.get("username"),
-                    proxy_password=proxy_data.get("password"),
-                    start_url="about:blank",
+                ChromeLauncher.launch(
+                    account.name,
+                    account.profile_path,
+                    port,
+                    proxy=proxy_data,
+                    start_url="https://wordstat.yandex.ru",
                 )
                 used_ports.add(port)
-                self.log_action(f"✅ [{account.name}] Chrome запущен (порт {port})")
-                self._set_table_status(row, f"Браузер запущен (порт {port})")
+                self.log_action(f"Chrome запущен для {account.name} (порт {port})")
+                self._set_table_status(row, f"Запуск Chrome (порт {port})")
+                threading.Thread(
+                    target=self._check_cdp_in_thread,
+                    args=(account.name, port, row),
+                    daemon=True,
+                ).start()
             except FileNotFoundError:
                 message = (
                     "Не найден Chrome по пути C:/Program Files/Google/Chrome/Application/chrome.exe. "
-                    "Установите Chrome или обновите путь в chrome_launcher_directparser.py."
+                    "Установите Chrome или обновите путь в chrome_launcher.py."
                 )
                 self.log_action(f"[ERROR] {message}")
                 QMessageBox.critical(self, "Chrome", message)

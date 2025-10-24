@@ -7,10 +7,20 @@ import time
 
 from sqlalchemy import select
 
-from ..core.db import SessionLocal
-from ..core.models import Account
-from ..utils.text_fix import fix_mojibake
-from .proxy_manager import ProxyManager
+try:
+    # Относительные импорты для запуска как пакета
+    from ..core.db import SessionLocal
+    from ..core.models import Account
+    from ..utils.text_fix import fix_mojibake
+    from .proxy_manager import ProxyManager
+    from .chrome_launcher import ChromeLauncher
+except ImportError:
+    # Абсолютные импорты для запуска как скрипта
+    from core.db import SessionLocal
+    from core.models import Account
+    from utils.text_fix import fix_mojibake
+    from .proxy_manager import ProxyManager
+    from .chrome_launcher import ChromeLauncher
 
 # Для проверки прокси и автологина
 try:
@@ -264,9 +274,7 @@ def get_cookies_status(account: Account) -> str:
     if not raw_path:
         return "Нет профиля"
 
-    profile_path = Path(raw_path)
-    if not profile_path.is_absolute():
-        profile_path = Path("C:/AI/yandex").joinpath(profile_path)
+    profile_path = ChromeLauncher._normalise_profile_path(raw_path, account.name)
 
     candidates = [
         ("Chrome", profile_path / "Default" / "Network" / "Cookies"),
@@ -306,7 +314,7 @@ async def autologin_account(account: Account) -> Dict[str, Any]:
     if not ASYNC_AVAILABLE:
         return {"ok": False, "message": "Playwright не установлен"}
     
-    profile_path = Path(account.profile_path)
+    profile_path = ChromeLauncher._normalise_profile_path(account.profile_path, account.name)
     profile_path.mkdir(parents=True, exist_ok=True)
     storage_file = profile_path / "storage_state.json"
     
@@ -383,9 +391,7 @@ def get_profile_ctx(name: str | None) -> dict[str, str | None]:
         account = session.execute(stmt).scalar_one_or_none()
         if not account:
             return {"storage_state": None, "proxy": None}
-        profile_path = Path(account.profile_path)
-        if not profile_path.is_absolute():
-            profile_path = Path("C:/AI/yandex").joinpath(profile_path)
+        profile_path = ChromeLauncher._normalise_profile_path(account.profile_path, account.name)
         storage_file = None
         for candidate in [
             profile_path / "storage_state.json",
@@ -399,5 +405,3 @@ def get_profile_ctx(name: str | None) -> dict[str, str | None]:
             "storage_state": storage_file,
             "proxy": account.proxy,
         }
-
-
