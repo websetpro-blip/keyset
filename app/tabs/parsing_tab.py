@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import random
+import asyncio
+import sys
 import time
 from collections import defaultdict
+from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt, QThread, Signal
@@ -28,11 +30,24 @@ from PySide6.QtWidgets import (
 from ..widgets.geo_tree import GeoTree
 from ..keys_panel import KeysPanel
 try:
-    from ...services.accounts import list_profiles, get_profile_ctx
+    from ...services.accounts import list_profiles, get_profile_ctx, get_account_by_email
     from ...services.wordstat_bridge import collect_frequency, collect_depth, collect_forecast
 except ImportError:
-    from services.accounts import list_profiles, get_profile_ctx
+    from services.accounts import list_profiles, get_profile_ctx, get_account_by_email
     from services.wordstat_bridge import collect_frequency, collect_depth, collect_forecast
+
+# Импорт turbo_parser_10tabs
+TURBO_PARSER_PATH = Path("C:/AI/yandex")
+if TURBO_PARSER_PATH.exists() and str(TURBO_PARSER_PATH) not in sys.path:
+    sys.path.insert(0, str(TURBO_PARSER_PATH))
+
+try:
+    from turbo_parser_10tabs import turbo_parser_10tabs
+    TURBO_PARSER_AVAILABLE = True
+except ImportError as e:
+    print(f"[WARNING] turbo_parser_10tabs not available: {e}")
+    turbo_parser_10tabs = None
+    TURBO_PARSER_AVAILABLE = False
 
 
 class ParsingWorker(QThread):
@@ -66,14 +81,30 @@ class ParsingWorker(QThread):
         self._stop_requested = True
 
     def run(self) -> None:  # type: ignore[override]
+        rows = []
         try:
             if self._mode == "freq":
-                rows = collect_frequency(
-                    self.phrases,
-                    modes=self.modes,
-                    regions=self.geo_ids,
-                    profile=self.profile,
-                )
+                # Попробовать использовать turbo_parser_10tabs
+                if TURBO_PARSER_AVAILABLE and self.profile:
+                    try:
+                        rows = self._run_turbo_parser()
+                    except Exception as turbo_error:
+                        print(f"[ERROR] Turbo parser failed: {turbo_error}")
+                        # Fallback к старому методу
+                        rows = collect_frequency(
+                            self.phrases,
+                            modes=self.modes,
+                            regions=self.geo_ids,
+                            profile=self.profile,
+                        )
+                else:
+                    # Использовать старый метод
+                    rows = collect_frequency(
+                        self.phrases,
+                        modes=self.modes,
+                        regions=self.geo_ids,
+                        profile=self.profile,
+                    )
             elif self._mode in {"depth-left", "depth-right"}:
                 rows = collect_depth(
                     self.phrases,
@@ -90,14 +121,18 @@ class ParsingWorker(QThread):
                 )
             else:
                 rows = []
-        except Exception:
+        except Exception as e:
+            print(f"[ERROR] Parsing failed: {e}")
+            import traceback
+            traceback.print_exc()
+            # Не генерируем Mock данные, возвращаем ошибку
             rows = [
                 {
                     "phrase": phrase,
-                    "ws": random.randint(100, 9000),
-                    "qws": random.randint(50, 4000),
-                    "bws": random.randint(10, 1200),
-                    "status": "Mock",
+                    "ws": "",
+                    "qws": "",
+                    "bws": "",
+                    "status": f"Error: {str(e)}",
                 }
                 for phrase in self.phrases
             ]
@@ -112,6 +147,49 @@ class ParsingWorker(QThread):
             }
         )
         self.finished.emit(rows)
+
+    def _run_turbo_parser(self) -> list[dict]:
+        """Запустить turbo_parser_10tabs и преобразовать результаты."""
+        # Получить данные аккаунта
+        account_data = get_account_by_email(self.profile)
+        if not account_data:
+            raise ValueError(f"Account {self.profile} not found")
+
+        profile_path = Path(account_data["profile_path"])
+        proxy_uri = account_data.get("proxy")
+
+        print(f"[TURBO] Starting turbo parser for {self.profile}")
+        print(f"[TURBO] Profile: {profile_path}")
+        print(f"[TURBO] Proxy: {proxy_uri or 'None'}")
+        print(f"[TURBO] Phrases: {len(self.phrases)}")
+
+        # Запустить async функцию
+        results = asyncio.run(
+            turbo_parser_10tabs(
+                account_name=self.profile,
+                profile_path=profile_path,
+                phrases=self.phrases,
+                headless=False,
+                proxy_uri=proxy_uri,
+            )
+        )
+
+        # Преобразовать результаты из Dict[str, int] в формат таблицы
+        rows = []
+        for phrase in self.phrases:
+            freq = results.get(phrase, 0)
+            rows.append(
+                {
+                    "phrase": phrase,
+                    "ws": freq if freq > 0 else "",
+                    "qws": "",  # turbo_parser возвращает только базовую частотность
+                    "bws": "",  # turbo_parser возвращает только базовую частотность
+                    "status": "OK" if freq > 0 else "No data",
+                }
+            )
+
+        print(f"[TURBO] Completed: {len(results)} results")
+        return rows
 
 
 class ParsingTab(QWidget):
