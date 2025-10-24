@@ -11,6 +11,7 @@ try:
     # Относительные импорты для запуска как пакета
     from ..core.db import SessionLocal
     from ..core.models import Account
+    from ..utils.proxy import proxy_to_playwright
     from ..utils.text_fix import fix_mojibake
     from .proxy_manager import ProxyManager
     from .chrome_launcher import ChromeLauncher
@@ -18,6 +19,7 @@ except ImportError:
     # Абсолютные импорты для запуска как скрипта
     from core.db import SessionLocal
     from core.models import Account
+    from utils.proxy import proxy_to_playwright
     from utils.text_fix import fix_mojibake
     from .proxy_manager import ProxyManager
     from .chrome_launcher import ChromeLauncher
@@ -319,8 +321,7 @@ async def autologin_account(account: Account) -> Dict[str, Any]:
     storage_file = profile_path / "storage_state.json"
     
     try:
-        from ..utils.proxy import parse_proxy
-        proxy_config = parse_proxy(account.proxy) if account.proxy else None
+        proxy_config = proxy_to_playwright(account.proxy)
         
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(headless=False)

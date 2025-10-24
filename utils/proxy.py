@@ -3,7 +3,16 @@
 Парсинг строк прокси в формат Playwright
 """
 
-from typing import Optional, Dict
+from typing import Dict, Optional, Union
+
+ProxyConfig = Dict[str, str]
+ProxyInput = Union[str, Dict[str, str], None]
+
+__all__ = [
+    "proxy_to_playwright",
+    "parse_proxy",
+    "parse_proxy_for_playwright",
+]
 
 
 def _looks_like_host_port(part: str) -> bool:
@@ -19,7 +28,7 @@ def _looks_like_host_port(part: str) -> bool:
     return False
 
 
-def parse_proxy(proxy_str: Optional[str]) -> Optional[Dict[str, str]]:
+def parse_proxy(proxy_str: Optional[str]) -> Optional[ProxyConfig]:
     """
     Парсит строку прокси в формат Playwright API
     
@@ -100,7 +109,7 @@ def parse_proxy(proxy_str: Optional[str]) -> Optional[Dict[str, str]]:
     username = username.strip() if isinstance(username, str) else None
     password = password.strip() if isinstance(password, str) else None
 
-    result: Dict[str, str] = {"server": f"{scheme}://{host}:{port}"}
+    result: ProxyConfig = {"server": f"{scheme}://{host}:{port}"}
     if username:
         result["username"] = username
     if password:
@@ -108,7 +117,31 @@ def parse_proxy(proxy_str: Optional[str]) -> Optional[Dict[str, str]]:
     return result
 
 
-def parse_proxy_for_playwright(proxy_string: str) -> dict:
+def proxy_to_playwright(proxy: ProxyInput) -> Optional[ProxyConfig]:
+    """
+    Приводит строку/словарь прокси к формату Playwright.
+
+    Args:
+        proxy: строка прокси или уже подготовленный словарь
+
+    Returns:
+        dict или None, если прокси не задан
+    """
+    if not proxy:
+        return None
+
+    if isinstance(proxy, dict):
+        # Возвращаем копию только с непустыми значениями
+        return {k: v for k, v in proxy.items() if isinstance(v, str) and v.strip()}  # type: ignore[return-value]
+
+    normalized = str(proxy).strip()
+    if not normalized:
+        return None
+
+    return parse_proxy(normalized)
+
+
+def parse_proxy_for_playwright(proxy_string: str) -> ProxyConfig:
     """
     Парсинг прокси в формат Playwright.
 
@@ -134,33 +167,7 @@ def parse_proxy_for_playwright(proxy_string: str) -> dict:
         >>> parse_proxy_for_playwright("socks5://user:pass@host:1080")
         {'server': 'socks5://host:1080', 'username': 'user', 'password': 'pass'}
     """
-    if not proxy_string:
-        return None
-
-    import re
-
-    # Парсинг с протоколом и авторизацией
-    match = re.match(
-        r'(?P<protocol>https?|socks5)://'
-        r'(?:(?P<username>[^:]+):(?P<password>[^@]+)@)?'
-        r'(?P<host>[^:]+):(?P<port>\d+)',
-        proxy_string
-    )
-
-    if match:
-        result = {
-            'server': f"{match.group('protocol')}://{match.group('host')}:{match.group('port')}"
-        }
-        if match.group('username'):
-            result['username'] = match.group('username')
-            result['password'] = match.group('password')
-        return result
-
-    # Парсинг без протокола (host:port)
-    match = re.match(r'(?P<host>[^:]+):(?P<port>\d+)', proxy_string)
-    if match:
-        return {
-            'server': f"http://{match.group('host')}:{match.group('port')}"
-        }
-
-    raise ValueError(f"Неверный формат прокси: {proxy_string}")
+    result = proxy_to_playwright(proxy_string)
+    if result is None:
+        raise ValueError(f"Неверный формат прокси: {proxy_string}")
+    return result

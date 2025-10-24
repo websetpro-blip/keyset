@@ -11,12 +11,12 @@ from playwright.async_api import async_playwright, expect
 from PySide6.QtCore import QObject, Signal
 
 try:
-    from ..utils.proxy import parse_proxy_for_playwright  # type: ignore
+    from ..utils.proxy import proxy_to_playwright  # type: ignore
 except ImportError:  # pragma: no cover - fallback when running as script
     try:
-        from utils.proxy import parse_proxy_for_playwright  # type: ignore
+        from utils.proxy import proxy_to_playwright  # type: ignore
     except ImportError:  # pragma: no cover
-        parse_proxy_for_playwright = None
+        proxy_to_playwright = None
 
 LOG_DIR = Path(__file__).resolve().parents[1] / "logs"
 LOGIN_LOG_FILE = LOG_DIR / "autologin_debug.log"
@@ -90,26 +90,28 @@ class YandexSmartLogin(QObject):
                 if proxy:
                     self.status_update.emit("[PROXY] Настройка прокси...")
                     _log_debug(f"raw proxy value received: {proxy}")
-                    if callable(parse_proxy_for_playwright):
-                        try:
-                            proxy_config = parse_proxy_for_playwright(proxy)
-                        except Exception as exc:  # pragma: no cover - diagnostic only
-                            proxy_config = None
-                            self.status_update.emit(f"[WARNING] Ошибка разбора прокси: {exc}")
-                            _log_debug(f"proxy parse error: {exc}")
-                    if proxy_config:
-                        server_label = proxy_config.get("server")
-                        user_label = proxy_config.get("username")
-                        if user_label:
-                            self.status_update.emit(f"[OK] Прокси настроен: {server_label} (user: {user_label})")
-                            _log_debug(f"proxy configured server={server_label} user={user_label}")
+                    try:
+                        if callable(proxy_to_playwright):
+                            proxy_config = proxy_to_playwright(proxy)
                         else:
-                            self.status_update.emit(f"[OK] Прокси настроен: {server_label}")
-                            _log_debug(f"proxy configured server={server_label}")
+                            proxy_config = None
+                    except Exception as exc:  # pragma: no cover - diagnostic only
+                        proxy_config = None
+                        self.status_update.emit(f"[WARNING] Ошибка разбора прокси: {exc}")
+                        _log_debug(f"proxy parse error: {exc}")
+
+                    if proxy_config and proxy_config.get("server"):
+                        server_label = proxy_config.get("server", "")
+                        user_label = proxy_config.get("username")
+                        label_suffix = f" (user: {user_label})" if user_label else ""
+                        self.status_update.emit(f"[OK] Прокси настроен: {server_label}{label_suffix}")
+                        _log_debug(f"normalized proxy value: {proxy_config}")
                     else:
                         self.status_update.emit("[WARNING] Не удалось распознать прокси — запуск без прокси")
                         _log_debug("proxy parsing failed; running without proxy")
                         proxy_config = None
+                else:
+                    _log_debug("no proxy provided; running without proxy")
                 
                 # Запускаем Chrome с persistent context
                 # Playwright сам обработает прокси авторизацию!

@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 try:
-    from ..utils.proxy import parse_proxy
+    from ..utils.proxy import proxy_to_playwright
 except ImportError:
-    from utils.proxy import parse_proxy
+    from utils.proxy import proxy_to_playwright
 
 
 CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "proxies.json"
@@ -154,7 +154,7 @@ class ProxyManager:
             raw = (account.proxy or '').strip()
             if not raw:
                 continue
-            parsed = parse_proxy(raw)
+            parsed = proxy_to_playwright(raw)
             if not parsed or not parsed.get('server'):
                 continue
             key = (parsed['server'], parsed.get('username'), parsed.get('password'))
@@ -186,7 +186,7 @@ class ProxyManager:
                 raw = (account.proxy or '').strip()
                 if not raw:
                     continue
-                parsed = parse_proxy(raw)
+                parsed = proxy_to_playwright(raw)
                 if not parsed or not parsed.get('server'):
                     continue
                 key = (parsed['server'], parsed.get('username'), parsed.get('password'))

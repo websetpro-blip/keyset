@@ -10,11 +10,11 @@ import asyncio
 from typing import Dict, Optional
 
 try:
-    from ..utils.proxy import parse_proxy
+    from ..utils.proxy import proxy_to_playwright
     from .proxy_check import test_proxy as _test_proxy
     from .proxy_manager import ProxyManager
 except ImportError:
-    from utils.proxy import parse_proxy
+    from utils.proxy import proxy_to_playwright
     from .proxy_check import test_proxy as _test_proxy
     from .proxy_manager import ProxyManager
 
@@ -27,7 +27,7 @@ def _compose_proxy_url(raw: Optional[str]) -> Optional[str]:
     if not raw:
         return None
 
-    parsed = parse_proxy(raw)
+    parsed = proxy_to_playwright(raw)
     if not parsed:
         return None
 

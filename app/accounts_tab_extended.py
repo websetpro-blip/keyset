@@ -37,7 +37,7 @@ from ..services.cdp_connector import CDPConnector
 from ..services.cdp_connector_directparser import CDPConnectorDirectParser
 from ..services.captcha import CaptchaService
 from ..workers.visual_browser_manager import VisualBrowserManager, BrowserStatus
-from ..utils.proxy import parse_proxy
+from ..utils.proxy import proxy_to_playwright
 # Старый worker больше не используется, теперь CDP подход
 
 PROFILE_SELECT_COLUMN = 5
@@ -120,21 +120,6 @@ class AutoLoginThread(QThread):
         import json
         from pathlib import Path
 
-        profile_path_raw = self.account.profile_path
-
-        # ⚠️ ПРОВЕРКА: Профиль ДОЛжеН быть из БД!
-        if not profile_path_raw:
-            self.status_signal.emit(f"[ERROR] У аккаунта {self.account.name} НЕТ profile_path в БД!")
-            self.finished_signal.emit(False, "Профиль не указан в БД")
-            return
-
-        profile_path_obj = ChromeLauncher._normalise_profile_path(profile_path_raw, self.account.name)
-        profile_path = profile_path_obj.as_posix()
-        if profile_path != (profile_path_raw or ""):
-            self.status_signal.emit(f"[INFO] Путь профиля преобразован: {profile_path}")
-        else:
-            self.status_signal.emit(f"[OK] Профиль из БД: {profile_path}")
-
         accounts_file = Path("C:/AI/yandex-local/configs/accounts.json")
         if not accounts_file.exists():
             self.status_signal.emit(f"[ERROR] Файл accounts.json не найден!")
@@ -154,6 +139,32 @@ class AutoLoginThread(QThread):
             self.finished_signal.emit(False, f"Аккаунт не найден в accounts.json")
             return
 
+        profile_path_db = (self.account.profile_path or "").strip()
+        profile_path_config = (account_info.get("profile") or "").strip()
+
+        if profile_path_db:
+            self.status_signal.emit(f"[OK] Профиль из БД: {profile_path_db}")
+
+        if profile_path_config and profile_path_config != profile_path_db:
+            self.status_signal.emit(
+                f"[INFO] Профиль из accounts.json отличается: {profile_path_config}"
+            )
+
+        profile_path_source = profile_path_config or profile_path_db
+        if not profile_path_source:
+            self.status_signal.emit(
+                f"[ERROR] Для {self.account.name} не указан профиль ни в БД, ни в accounts.json"
+            )
+            self.finished_signal.emit(False, "Профиль не указан")
+            return
+
+        profile_path_obj = ChromeLauncher._normalise_profile_path(profile_path_source, self.account.name)
+        profile_path = profile_path_obj.as_posix()
+        if profile_path != profile_path_source:
+            self.status_signal.emit(f"[INFO] Путь профиля преобразован: {profile_path}")
+        else:
+            self.status_signal.emit(f"[INFO] Используем профиль: {profile_path}")
+
         self.status_signal.emit(f"[CDP] Запуск автологина для {self.account.name}...")
 
         secret_answer = self.secret_answer
@@ -172,21 +183,20 @@ class AutoLoginThread(QThread):
         if secret_answer:
             smart_login.set_secret_answer(secret_answer)
 
-        proxy_to_use = (account_info.get("proxy") or getattr(self.account, "proxy", None) or "").strip()
+        proxy_raw = (account_info.get("proxy") or getattr(self.account, "proxy", None) or "").strip()
+        proxy_to_use = proxy_to_playwright(proxy_raw)
         if proxy_to_use:
-            parsed_proxy = parse_proxy(proxy_to_use)
-            if parsed_proxy and parsed_proxy.get("server"):
-                server_label = parsed_proxy["server"]
-                user_label = parsed_proxy.get("username")
-                if user_label:
-                    self.status_signal.emit(f"[INFO] Используется прокси: {server_label} (user: {user_label})")
-                else:
-                    self.status_signal.emit(f"[INFO] Используется прокси: {server_label}")
+            server_label = proxy_to_use.get("server", "")
+            user_label = proxy_to_use.get("username")
+            if user_label:
+                self.status_signal.emit(f"[INFO] Используется прокси: {server_label} (user: {user_label})")
             else:
-                self.status_signal.emit("[WARNING] Формат прокси не распознан, пробую использовать как есть")
+                self.status_signal.emit(f"[INFO] Используется прокси: {server_label}")
         else:
-            proxy_to_use = None
-            self.status_signal.emit("[WARNING] Прокси для аккаунта не указан — запуск без прокси")
+            if proxy_raw:
+                self.status_signal.emit("[WARNING] Формат прокси не распознан — запуск без прокси")
+            else:
+                self.status_signal.emit("[WARNING] Прокси для аккаунта не указан — запуск без прокси")
 
         self.status_signal.emit(f"[SMART] Запускаю автологин...")
         success = await smart_login.login(
@@ -1256,7 +1266,7 @@ class AccountsTabExtended(QWidget):
             if row >= len(self._accounts):
                 continue
             account = self._accounts[row]
-            proxy_data = parse_proxy(account.proxy)
+            proxy_data = proxy_to_playwright(account.proxy)
             if not proxy_data or not proxy_data.get("server"):
                 self.log_action(f"[{account.name}] Прокси не настроен")
                 continue

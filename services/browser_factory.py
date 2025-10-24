@@ -18,14 +18,14 @@ from playwright.sync_api import sync_playwright
 try:
     from ..core.db import SessionLocal
     from ..core.models import Account
-    from ..utils.proxy import parse_proxy
+    from ..utils.proxy import proxy_to_playwright
     from ..utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT
     from .proxy_manager import Proxy, ProxyManager
     from .chrome_launcher import ChromeLauncher
 except ImportError:
     from core.db import SessionLocal
     from core.models import Account
-    from utils.proxy import parse_proxy
+    from utils.proxy import proxy_to_playwright
     from utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT
     from .proxy_manager import Proxy, ProxyManager
     from .chrome_launcher import ChromeLauncher
@@ -157,7 +157,7 @@ def _prepare_proxy(
     if proxy_obj:
         return proxy_obj, proxy_obj.playwright_config()
 
-    parsed = parse_proxy(account.proxy) if account.proxy else None
+    parsed = proxy_to_playwright(account.proxy)
     return None, parsed
 
 
@@ -197,7 +197,7 @@ def for_account(
     if not proxy_obj and not proxy_kwargs and config_entry:
         config_proxy = config_entry.get("proxy")
         if isinstance(config_proxy, str) and config_proxy.strip():
-            parsed_proxy = parse_proxy(config_proxy.strip())
+            parsed_proxy = proxy_to_playwright(config_proxy.strip())
             if parsed_proxy:
                 proxy_kwargs = parsed_proxy
 

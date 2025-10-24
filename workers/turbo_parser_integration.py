@@ -17,7 +17,7 @@ from urllib.parse import quote
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
 
 try:
-    from ..utils.proxy import parse_proxy
+    from ..utils.proxy import proxy_to_playwright
     from ..utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT, fix_mojibake
     from ..core.db import SessionLocal
     from ..core.models import Account
@@ -25,7 +25,7 @@ try:
     from .visual_browser_manager import VisualBrowserManager, BrowserStatus
     from .auto_auth_handler import AutoAuthHandler
 except ImportError:
-    from utils.proxy import parse_proxy
+    from utils.proxy import proxy_to_playwright
     from utils.text_fix import WORDSTAT_FETCH_NORMALIZER_SCRIPT, fix_mojibake
     from core.db import SessionLocal
     from core.models import Account
@@ -244,13 +244,15 @@ class TurboWordstatParser:
             proxy_obj = self.proxy_manager.acquire(self.account.proxy_id)
             self._proxy_item = proxy_obj
         elif self.account and getattr(self.account, "proxy", None):
-            parsed = parse_proxy(self.account.proxy)
+            parsed = proxy_to_playwright(self.account.proxy)
             if parsed and parsed.get("server"):
+                server_value = parsed["server"]
+                scheme = server_value.split("://", 1)[0] if "://" in server_value else "http"
                 proxy_obj = Proxy(
                     id="legacy",
                     label="legacy",
-                    type=parsed.get("server", "http").split("://")[0],
-                    server=parsed.get("server"),
+                    type=scheme,
+                    server=server_value,
                     username=parsed.get("username"),
                     password=parsed.get("password"),
                 )
