@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 import time
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -30,10 +32,10 @@ from PySide6.QtWidgets import (
 from ..widgets.geo_tree import GeoTree
 from ..keys_panel import KeysPanel
 try:
-    from ...services.accounts import list_profiles, get_profile_ctx, get_account_by_email
+    from ...services.accounts import list_profiles, get_profile_ctx, get_account_by_email, list_accounts
     from ...services.wordstat_bridge import collect_frequency, collect_depth, collect_forecast
 except ImportError:
-    from services.accounts import list_profiles, get_profile_ctx, get_account_by_email
+    from services.accounts import list_profiles, get_profile_ctx, get_account_by_email, list_accounts
     from services.wordstat_bridge import collect_frequency, collect_depth, collect_forecast
 
 # Импорт turbo_parser_10tabs
@@ -55,6 +57,7 @@ class ParsingWorker(QThread):
 
     tick = Signal(dict)
     finished = Signal(list)
+    log_signal = Signal(str)  # Новый сигнал для логирования в GUI
 
     def __init__(
         self,
@@ -77,20 +80,47 @@ class ParsingWorker(QThread):
         self.profile_ctx = profile_ctx or {}
         self._stop_requested = False
 
+        # Инициализация логирования
+        self.log_file = Path("C:/AI/yandex/keyset/logs/parsing_journal.log")
+        self.log_file.parent.mkdir(parents=True, exist_ok=True)
+        self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     def stop(self) -> None:
         self._stop_requested = True
 
+    def _log(self, message: str, level: str = "INFO") -> None:
+        """Логировать в файл и отправить в GUI через signal."""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        log_line = f"[{timestamp}] [{level}] [{self.session_id}] {message}"
+
+        # Записать в файл
+        try:
+            with open(self.log_file, "a", encoding="utf-8") as f:
+                f.write(log_line + "\n")
+        except Exception as e:
+            print(f"[ERROR] Failed to write log: {e}")
+
+        # Отправить в GUI
+        self.log_signal.emit(log_line)
+
     def run(self) -> None:  # type: ignore[override]
+        self._log("▶ ПАРСИНГ НАЧИНАЕТСЯ", "START")
+        self._log(f"Режим: {self._mode}", "INFO")
+        self._log(f"Фраз: {len(self.phrases)}", "INFO")
+        self._log(f"Профиль: {self.profile or 'не выбран'}", "INFO")
+
         rows = []
         try:
             if self._mode == "freq":
                 # Попробовать использовать turbo_parser_10tabs
                 if TURBO_PARSER_AVAILABLE and self.profile:
+                    self._log("Используется TurboParser", "INFO")
                     try:
                         rows = self._run_turbo_parser()
                     except Exception as turbo_error:
-                        print(f"[ERROR] Turbo parser failed: {turbo_error}")
+                        self._log(f"TurboParser failed: {turbo_error}", "ERROR")
                         # Fallback к старому методу
+                        self._log("Fallback к collect_frequency", "WARNING")
                         rows = collect_frequency(
                             self.phrases,
                             modes=self.modes,
@@ -99,6 +129,7 @@ class ParsingWorker(QThread):
                         )
                 else:
                     # Использовать старый метод
+                    self._log("Используется collect_frequency", "INFO")
                     rows = collect_frequency(
                         self.phrases,
                         modes=self.modes,
@@ -122,9 +153,10 @@ class ParsingWorker(QThread):
             else:
                 rows = []
         except Exception as e:
-            print(f"[ERROR] Parsing failed: {e}")
+            self._log(f"❌ ОШИБКА ПАРСИНГА: {str(e)}", "ERROR")
             import traceback
-            traceback.print_exc()
+            error_trace = traceback.format_exc()
+            self._log(f"TRACE: {error_trace}", "ERROR")
             # Не генерируем Mock данные, возвращаем ошибку
             rows = [
                 {
@@ -137,6 +169,7 @@ class ParsingWorker(QThread):
                 for phrase in self.phrases
             ]
 
+        self._log(f"✅ ПАРСИНГ ЗАВЕРШЁН: {len(rows)} результатов", "SUCCESS")
         self.tick.emit(
             {
                 "type": self._mode,
@@ -149,46 +182,72 @@ class ParsingWorker(QThread):
         self.finished.emit(rows)
 
     def _run_turbo_parser(self) -> list[dict]:
-        """Запустить turbo_parser_10tabs и преобразовать результаты."""
+        """Запустить turbo_parser_10tabs с подробным логированием."""
+        self._log("Получение данных аккаунта...", "INFO")
+
         # Получить данные аккаунта
         account_data = get_account_by_email(self.profile)
         if not account_data:
+            self._log(f"❌ Аккаунт {self.profile} не найден в БД", "ERROR")
             raise ValueError(f"Account {self.profile} not found")
 
         profile_path = Path(account_data["profile_path"])
         proxy_uri = account_data.get("proxy")
 
-        print(f"[TURBO] Starting turbo parser for {self.profile}")
-        print(f"[TURBO] Profile: {profile_path}")
-        print(f"[TURBO] Proxy: {proxy_uri or 'None'}")
-        print(f"[TURBO] Phrases: {len(self.phrases)}")
+        self._log(f"Аккаунт: {self.profile}", "INFO")
+        self._log(f"Профиль Chrome: {profile_path}", "INFO")
+        self._log(f"Прокси: {proxy_uri or 'НЕТ'}", "INFO")
+        self._log(f"Фраз для парсинга: {len(self.phrases)}", "INFO")
+
+        # Определить режимы парсинга
+        modes_active = {
+            "ws": self.modes.get("ws", True),
+            "qws": self.modes.get("qws", False),
+            "bws": self.modes.get("bws", False),
+        }
+        self._log(f"Режимы: WS={modes_active['ws']}, \"WS\"={modes_active['qws']}, !WS={modes_active['bws']}", "INFO")
+
+        self._log("Запуск браузера и турбо-парсера...", "INFO")
 
         # Запустить async функцию
-        results = asyncio.run(
-            turbo_parser_10tabs(
-                account_name=self.profile,
-                profile_path=profile_path,
-                phrases=self.phrases,
-                headless=False,
-                proxy_uri=proxy_uri,
+        try:
+            results = asyncio.run(
+                turbo_parser_10tabs(
+                    account_name=self.profile,
+                    profile_path=profile_path,
+                    phrases=self.phrases,
+                    headless=False,
+                    proxy_uri=proxy_uri,
+                )
             )
-        )
+        except Exception as e:
+            self._log(f"❌ Ошибка при запуске парсера: {str(e)}", "ERROR")
+            raise
+
+        self._log(f"Получено результатов: {len(results)}", "INFO")
 
         # Преобразовать результаты из Dict[str, int] в формат таблицы
         rows = []
         for phrase in self.phrases:
             freq = results.get(phrase, 0)
+            status = "OK" if freq > 0 else "No data"
+
             rows.append(
                 {
                     "phrase": phrase,
                     "ws": freq if freq > 0 else "",
-                    "qws": "",  # turbo_parser возвращает только базовую частотность
-                    "bws": "",  # turbo_parser возвращает только базовую частотность
-                    "status": "OK" if freq > 0 else "No data",
+                    "qws": "",  # TODO: turbo_parser пока возвращает только базовую частотность
+                    "bws": "",  # TODO: turbo_parser пока возвращает только базовую частотность
+                    "status": status,
                 }
             )
 
-        print(f"[TURBO] Completed: {len(results)} results")
+            # Логировать только первые 5 и последние 5 результатов
+            if len(rows) <= 5 or len(rows) > len(self.phrases) - 5:
+                if freq > 0:
+                    self._log(f"  {phrase}: {freq}", "DATA")
+
+        self._log(f"✅ Турбо-парсинг завершён успешно", "SUCCESS")
         return rows
 
 
@@ -325,6 +384,66 @@ class ParsingTab(QWidget):
             self._current_profile = None
         self.cmb_profile.blockSignals(False)
         self._update_profile_context()
+
+    def get_all_available_accounts(self) -> list[dict]:
+        """Получить ВСЕ аккаунты из БД с профилями и прокси."""
+        try:
+            accounts_list = list_accounts()
+            result = []
+            for acc in accounts_list:
+                if hasattr(acc, 'profile_path') and acc.profile_path:
+                    result.append({
+                        "email": acc.name,
+                        "proxy": acc.proxy if hasattr(acc, 'proxy') else None,
+                        "profile_path": acc.profile_path,
+                    })
+            return result
+        except Exception as e:
+            print(f"[ERROR] Cannot get accounts: {e}")
+            return []
+
+    def save_session_state(self, partial_results: dict = None) -> None:
+        """Сохранить состояние парсинга для восстановления."""
+        session_file = Path("C:/AI/yandex/keyset/logs/parsing_session.json")
+        session_file.parent.mkdir(parents=True, exist_ok=True)
+
+        phrases = [line.strip() for line in self.phrases_edit.toPlainText().splitlines() if line.strip()]
+
+        state = {
+            "timestamp": datetime.now().isoformat(),
+            "phrases": phrases,
+            "modes": {
+                "ws": self.chk_ws.isChecked(),
+                "qws": self.chk_qws.isChecked(),
+                "bws": self.chk_bws.isChecked(),
+            },
+            "geo_ids": self.geo_tree.selected_geo_ids(),
+            "profile": self._current_profile,
+            "partial_results": partial_results or {},
+        }
+
+        try:
+            with open(session_file, "w", encoding="utf-8") as f:
+                json.dump(state, f, ensure_ascii=False, indent=2)
+            print(f"[SESSION] Состояние сохранено: {session_file}")
+        except Exception as e:
+            print(f"[ERROR] Failed to save session: {e}")
+
+    def load_session_state(self) -> dict | None:
+        """Загрузить сохранённое состояние."""
+        session_file = Path("C:/AI/yandex/keyset/logs/parsing_session.json")
+
+        if not session_file.exists():
+            return None
+
+        try:
+            with open(session_file, "r", encoding="utf-8") as f:
+                state = json.load(f)
+            print(f"[SESSION] Состояние загружено: {session_file}")
+            return state
+        except Exception as e:
+            print(f"[ERROR] Failed to load session: {e}")
+            return None
 
     # ------------------------------------------------------------------ slots
     def _wire_signals(self) -> None:
