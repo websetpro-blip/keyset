@@ -68,7 +68,18 @@ class ChromeLauncherDirectParser:
         ]
 
         proxy_scheme = "http" if proxy_data["is_http"] else "socks5"
-        proxy_flag = f"{proxy_scheme}://{proxy_data['server']}:{proxy_data['port']}"
+        proxy_user = proxy_data.get("username")
+        proxy_pass = proxy_data.get("password")
+        if proxy_user:
+            proxy_flag = (
+                f"{proxy_scheme}://{proxy_user}:{proxy_pass or ''}"
+                f"@{proxy_data['server']}:{proxy_data['port']}"
+            )
+            masked = f"{proxy_scheme}://{proxy_user}:***@{proxy_data['server']}:{proxy_data['port']}"
+            LOGGER.info("[%s] Proxy with auth: %s", account_name, masked)
+        else:
+            proxy_flag = f"{proxy_scheme}://{proxy_data['server']}:{proxy_data['port']}"
+            LOGGER.info("[%s] Proxy without auth: %s", account_name, proxy_flag)
         args.append(f"--proxy-server={proxy_flag}")
         args.append(start_url)
 
