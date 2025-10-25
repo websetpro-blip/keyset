@@ -191,8 +191,22 @@ class ParsingWorker(QThread):
             self._log(f"❌ Аккаунт {self.profile} не найден в БД", "ERROR")
             raise ValueError(f"Account {self.profile} not found")
 
-        profile_path = Path(account_data["profile_path"])
-        proxy_uri = account_data.get("proxy")
+        raw_profile_path = account_data.get("profile_path") or ""
+        if not raw_profile_path:
+            self._log(f"❌ Для аккаунта {self.profile} не указан путь к профилю", "ERROR")
+            raise ValueError(f"Profile path not set for account {self.profile}")
+        proxy_uri = (account_data.get("proxy") or None) if isinstance(account_data, dict) else None
+
+        profile_path = Path(raw_profile_path)
+        if not profile_path.is_absolute():
+            base_dir = Path("C:/AI/yandex")
+            profile_path = (base_dir / profile_path).resolve()
+        else:
+            profile_path = profile_path.resolve()
+
+        if not profile_path.exists():
+            self._log(f"❌ Профиль не найден: {profile_path}", "ERROR")
+            raise FileNotFoundError(f"Profile path does not exist: {profile_path}")
 
         self._log(f"Аккаунт: {self.profile}", "INFO")
         self._log(f"Профиль Chrome: {profile_path}", "INFO")
@@ -218,7 +232,6 @@ class ParsingWorker(QThread):
                     phrases=self.phrases,
                     headless=False,
                     proxy_uri=proxy_uri,
-                    modes=modes_active,  # Передаем режимы парсинга
                 )
             )
         except Exception as e:
@@ -229,14 +242,39 @@ class ParsingWorker(QThread):
 
         # Преобразовать результаты из Dict[str, Dict[str, int]] в формат таблицы
         rows = []
+        if not isinstance(results, dict):
+            self._log("❌ Турбо-парсер вернул неожиданный тип результата", "ERROR")
+            raise TypeError("Unexpected turbo_parser_10tabs result type")
+
+        def _coerce_freq(value: object) -> int:
+            if value is None:
+                return 0
+            if isinstance(value, bool):
+                return int(value)
+            if isinstance(value, (int, float)):
+                return int(value)
+            if isinstance(value, str):
+                stripped = value.strip().replace(" ", "")
+                try:
+                    return int(float(stripped))
+                except ValueError:
+                    return 0
+            return 0
+
         for phrase in self.phrases:
-            freq_data = results.get(phrase, {})
-            ws_freq = freq_data.get("ws", 0)
-            qws_freq = freq_data.get("qws", 0)
-            bws_freq = freq_data.get("bws", 0)
+            freq_data = results.get(phrase)
+
+            if isinstance(freq_data, dict):
+                ws_freq = _coerce_freq(freq_data.get("ws"))
+                qws_freq = _coerce_freq(freq_data.get("qws"))
+                bws_freq = _coerce_freq(freq_data.get("bws"))
+            else:
+                ws_freq = _coerce_freq(freq_data)
+                qws_freq = 0
+                bws_freq = 0
 
             has_data = ws_freq > 0 or qws_freq > 0 or bws_freq > 0
-            status = "OK" if has_data else "No data"
+            status = "OK" if has_data else "Нет данных"
 
             rows.append(
                 {
