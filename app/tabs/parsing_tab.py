@@ -8,7 +8,7 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
@@ -20,455 +20,452 @@ from PySide6.QtWidgets import (
     QPushButton,
     QTextEdit,
     QLabel,
-    QSpinBox,
     QCheckBox,
-    QComboBox,
     QTableWidget,
     QTableWidgetItem,
     QProgressBar,
     QFileDialog,
+    QListWidget,
+    QListWidgetItem,
 )
 
 from ..widgets.geo_tree import GeoTree
 from ..keys_panel import KeysPanel
+
 try:
-    from ...services.accounts import list_profiles, get_profile_ctx, get_account_by_email, list_accounts
-    from ...services.wordstat_bridge import collect_frequency, collect_depth, collect_forecast
+    from ...services.accounts import list_accounts
 except ImportError:
-    from services.accounts import list_profiles, get_profile_ctx, get_account_by_email, list_accounts
-    from services.wordstat_bridge import collect_frequency, collect_depth, collect_forecast
+    from services.accounts import list_accounts
 
 # Импорт turbo_parser_10tabs
-TURBO_PARSER_PATH = Path("C:/AI/yandex")
-if TURBO_PARSER_PATH.exists() and str(TURBO_PARSER_PATH) not in sys.path:
-    sys.path.insert(0, str(TURBO_PARSER_PATH))
+PACKAGE_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+if str(PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_ROOT))
+
+BASE_DIR = PROJECT_ROOT
+SESSION_FILE = BASE_DIR / "keyset/logs/parsing_session.json"
 
 try:
-    from turbo_parser_10tabs import turbo_parser_10tabs
+    from turbo_parser_improved import turbo_parser_10tabs  # type: ignore
     TURBO_PARSER_AVAILABLE = True
-except ImportError as e:
-    print(f"[WARNING] turbo_parser_10tabs not available: {e}")
-    turbo_parser_10tabs = None
-    TURBO_PARSER_AVAILABLE = False
+except ImportError as improved_error:  # pragma: no cover - optional dependency
+    try:
+        from turbo_parser_10tabs import turbo_parser_10tabs  # type: ignore
+        TURBO_PARSER_AVAILABLE = True
+    except ImportError as e:
+        print(f"[WARNING] turbo_parser_10tabs not available: {e}")
+        turbo_parser_10tabs = None
+        TURBO_PARSER_AVAILABLE = False
 
 
-class ParsingWorker(QThread):
-    """Фоновый запуск частотки / вглубь в отдельном потоке."""
+class SingleParsingTask:
+    """Одна задача парсинга для конкретного профиля"""
+    
+    def __init__(self, profile_email: str, profile_path: str, proxy: str, phrases: List[str], session_id: str):
+        self.profile_email = profile_email
+        self.profile_path = Path(profile_path)
+        self.proxy = proxy
+        self.phrases = phrases
+        self.session_id = session_id
+        self.results = {}
+        self.status = "waiting"
+        self.progress = 0
+        self.logs = []
+        
+    def log(self, message: str, level: str = "INFO"):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        log_line = f"[{timestamp}] [{level}] [{self.profile_email}] {message}"
+        self.logs.append(log_line)
+        return log_line
+        
+    async def run(self):
+        """Запуск парсинга для этого профиля"""
+        self.status = "running"
+        self.log(f"Запуск парсинга для {len(self.phrases)} фраз", "INFO")
+        
+        try:
+            # Проверка профиля
+            if not self.profile_path.exists():
+                self.log(f"❌ Профиль не найден: {self.profile_path}", "ERROR")
+                self.status = "error"
+                return
+                
+            self.log(f"✓ Профиль: {self.profile_path}", "INFO")
+            self.log(f"✓ Прокси: {self.proxy or 'НЕТ'}", "INFO")
+            
+            # Запуск парсера
+            self.results = await turbo_parser_10tabs(
+                account_name=self.profile_email,
+                profile_path=self.profile_path,
+                phrases=self.phrases,
+                headless=False,
+                proxy_uri=self.proxy,
+            )
+            
+            self.log(f"✓ Парсинг завершён. Получено: {len(self.results)} результатов", "SUCCESS")
+            self.status = "completed"
+            self.progress = 100
+            
+        except Exception as e:
+            self.log(f"❌ Ошибка: {str(e)}", "ERROR")
+            self.status = "error"
+            self.progress = 0
 
-    tick = Signal(dict)
-    finished = Signal(list)
-    log_signal = Signal(str)  # Новый сигнал для логирования в GUI
 
+class MultiParsingWorker(QThread):
+    """Многопоточный воркер для запуска парсинга на всех профилях одновременно"""
+    
+    # Сигналы
+    log_signal = Signal(str)  # Общий лог
+    profile_log_signal = Signal(str, str)  # Лог конкретного профиля (email, message)
+    progress_signal = Signal(dict)  # Прогресс всех профилей
+    task_completed = Signal(str, dict)  # Профиль завершил работу (email, results)
+    all_finished = Signal(list)  # Все задачи завершены
+    
     def __init__(
         self,
-        mode: str,
-        phrases: list[str],
+        phrases: List[str],
         modes: dict,
-        depth_cfg: dict,
-        geo_ids: list[int],
-        profile: Optional[str],
-        profile_ctx: Optional[dict],
-        parent: QWidget | None,
+        geo_ids: List[int],
+        selected_profiles: List[dict],  # Список выбранных профилей
+        parent: QWidget | None = None,
     ):
         super().__init__(parent)
-        self._mode = mode
         self.phrases = phrases
         self.modes = modes
-        self.depth_cfg = depth_cfg
         self.geo_ids = geo_ids or [225]
-        self.profile = profile
-        self.profile_ctx = profile_ctx or {}
+        self.selected_profiles = selected_profiles
         self._stop_requested = False
-
-        # Инициализация логирования
-        self.log_file = Path("C:/AI/yandex/keyset/logs/parsing_journal.log")
-        self.log_file.parent.mkdir(parents=True, exist_ok=True)
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    def stop(self) -> None:
+        
+        # Создаем задачи для каждого профиля
+        self.tasks = []
+        for profile in selected_profiles:
+            task = SingleParsingTask(
+                profile_email=profile['email'],
+                profile_path=profile['profile_path'],
+                proxy=profile.get('proxy'),
+                phrases=self.phrases,
+                session_id=self.session_id
+            )
+            self.tasks.append(task)
+            
+        # Логирование
+        self.log_file = Path("C:/AI/yandex/keyset/logs/multiparser_journal.log")
+        self.log_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    def stop(self):
         self._stop_requested = True
-
-    def _log(self, message: str, level: str = "INFO") -> None:
-        """Логировать в файл и отправить в GUI через signal."""
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        log_line = f"[{timestamp}] [{level}] [{self.session_id}] {message}"
-
-        # Записать в файл
+        
+    def _write_log(self, message: str):
+        """Записать в файл и отправить в GUI"""
         try:
             with open(self.log_file, "a", encoding="utf-8") as f:
-                f.write(log_line + "\n")
+                f.write(message + "\n")
         except Exception as e:
-            print(f"[ERROR] Failed to write log: {e}")
-
-        # Отправить в GUI
-        self.log_signal.emit(log_line)
-
-    def run(self) -> None:  # type: ignore[override]
-        self._log("▶ ПАРСИНГ НАЧИНАЕТСЯ", "START")
-        self._log(f"Режим: {self._mode}", "INFO")
-        self._log(f"Фраз: {len(self.phrases)}", "INFO")
-        self._log(f"Профиль: {self.profile or 'не выбран'}", "INFO")
-
-        rows = []
+            print(f"Log write error: {e}")
+        
+        # Отправляем в GUI
+        self.log_signal.emit(message)
+    
+    def run(self):
+        """Основной метод запуска всех парсеров"""
+        self._write_log("=" * 70)
+        self._write_log(f"🚀 ЗАПУСК МНОГОПОТОЧНОГО ПАРСИНГА")
+        self._write_log(f"📊 Профилей: {len(self.selected_profiles)}")
+        self._write_log(f"📝 Фраз: {len(self.phrases)}")
+        self._write_log("=" * 70)
+        
+        # Создаем новый event loop для этого потока
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
         try:
-            if self._mode == "freq":
-                # Попробовать использовать turbo_parser_10tabs
-                if TURBO_PARSER_AVAILABLE and self.profile:
-                    self._log("Используется TurboParser", "INFO")
-                    try:
-                        rows = self._run_turbo_parser()
-                    except Exception as turbo_error:
-                        self._log(f"TurboParser failed: {turbo_error}", "ERROR")
-                        # Fallback к старому методу
-                        self._log("Fallback к collect_frequency", "WARNING")
-                        rows = collect_frequency(
-                            self.phrases,
-                            modes=self.modes,
-                            regions=self.geo_ids,
-                            profile=self.profile,
-                        )
-                else:
-                    # Использовать старый метод
-                    self._log("Используется collect_frequency", "INFO")
-                    rows = collect_frequency(
-                        self.phrases,
-                        modes=self.modes,
-                        regions=self.geo_ids,
-                        profile=self.profile,
-                    )
-            elif self._mode in {"depth-left", "depth-right"}:
-                rows = collect_depth(
-                    self.phrases,
-                    column="left" if self._mode.endswith("left") else "right",
-                    pages=self.depth_cfg.get("pages", 1),
-                    regions=self.geo_ids,
-                    profile=self.profile,
-                )
-            elif self._mode == "forecast":
-                rows = collect_forecast(
-                    self.phrases,
-                    regions=self.geo_ids,
-                    profile_ctx=self.profile_ctx,
-                )
-            else:
-                rows = []
-        except Exception as e:
-            self._log(f"❌ ОШИБКА ПАРСИНГА: {str(e)}", "ERROR")
-            import traceback
-            error_trace = traceback.format_exc()
-            self._log(f"TRACE: {error_trace}", "ERROR")
-            # Не генерируем Mock данные, возвращаем ошибку
-            rows = [
-                {
-                    "phrase": phrase,
-                    "ws": "",
-                    "qws": "",
-                    "bws": "",
-                    "status": f"Error: {str(e)}",
-                }
-                for phrase in self.phrases
-            ]
-
-        self._log(f"✅ ПАРСИНГ ЗАВЕРШЁН: {len(rows)} результатов", "SUCCESS")
-        self.tick.emit(
-            {
-                "type": self._mode,
-                "phrase": "",
-                "current": len(self.phrases),
-                "total": len(self.phrases),
-                "progress": 100,
-            }
-        )
-        self.finished.emit(rows)
-
-    def _run_turbo_parser(self) -> list[dict]:
-        """Запустить turbo_parser_10tabs с подробным логированием."""
-        self._log("Получение данных аккаунта...", "INFO")
-
-        # Получить данные аккаунта
-        account_data = get_account_by_email(self.profile)
-        if not account_data:
-            self._log(f"❌ Аккаунт {self.profile} не найден в БД", "ERROR")
-            raise ValueError(f"Account {self.profile} not found")
-
-        raw_profile_path = account_data.get("profile_path") or ""
-        if not raw_profile_path:
-            self._log(f"❌ Для аккаунта {self.profile} не указан путь к профилю", "ERROR")
-            raise ValueError(f"Profile path not set for account {self.profile}")
-        proxy_uri = (account_data.get("proxy") or None) if isinstance(account_data, dict) else None
-
-        profile_path = Path(raw_profile_path)
-        if not profile_path.is_absolute():
-            base_dir = Path("C:/AI/yandex")
-            profile_path = (base_dir / profile_path).resolve()
-        else:
-            profile_path = profile_path.resolve()
-
-        if not profile_path.exists():
-            self._log(f"❌ Профиль не найден: {profile_path}", "ERROR")
-            raise FileNotFoundError(f"Profile path does not exist: {profile_path}")
-
-        self._log(f"Аккаунт: {self.profile}", "INFO")
-        self._log(f"Профиль Chrome: {profile_path}", "INFO")
-        self._log(f"Прокси: {proxy_uri or 'НЕТ'}", "INFO")
-        self._log(f"Фраз для парсинга: {len(self.phrases)}", "INFO")
-
-        # Определить режимы парсинга
-        modes_active = {
-            "ws": self.modes.get("ws", True),
-            "qws": self.modes.get("qws", False),
-            "bws": self.modes.get("bws", False),
-        }
-        self._log(f"Режимы: WS={modes_active['ws']}, \"WS\"={modes_active['qws']}, !WS={modes_active['bws']}", "INFO")
-
-        self._log("Запуск браузера и турбо-парсера...", "INFO")
-
-        # Запустить async функцию
-        try:
-            results = asyncio.run(
-                turbo_parser_10tabs(
-                    account_name=self.profile,
-                    profile_path=profile_path,
-                    phrases=self.phrases,
-                    headless=False,
-                    proxy_uri=proxy_uri,
-                )
-            )
-        except Exception as e:
-            self._log(f"❌ Ошибка при запуске парсера: {str(e)}", "ERROR")
-            raise
-
-        self._log(f"Получено результатов: {len(results)}", "INFO")
-
-        # Преобразовать результаты из Dict[str, Dict[str, int]] в формат таблицы
-        rows = []
-        if not isinstance(results, dict):
-            self._log("❌ Турбо-парсер вернул неожиданный тип результата", "ERROR")
-            raise TypeError("Unexpected turbo_parser_10tabs result type")
-
-        def _coerce_freq(value: object) -> int:
-            if value is None:
-                return 0
-            if isinstance(value, bool):
-                return int(value)
-            if isinstance(value, (int, float)):
-                return int(value)
-            if isinstance(value, str):
-                stripped = value.strip().replace(" ", "")
-                try:
-                    return int(float(stripped))
-                except ValueError:
-                    return 0
-            return 0
-
-        for phrase in self.phrases:
-            freq_data = results.get(phrase)
-
-            if isinstance(freq_data, dict):
-                ws_freq = _coerce_freq(freq_data.get("ws"))
-                qws_freq = _coerce_freq(freq_data.get("qws"))
-                bws_freq = _coerce_freq(freq_data.get("bws"))
-            else:
-                ws_freq = _coerce_freq(freq_data)
-                qws_freq = 0
-                bws_freq = 0
-
-            has_data = ws_freq > 0 or qws_freq > 0 or bws_freq > 0
-            status = "OK" if has_data else "Нет данных"
-
-            rows.append(
-                {
-                    "phrase": phrase,
-                    "ws": ws_freq if ws_freq > 0 else "",
-                    "qws": qws_freq if qws_freq > 0 else "",
-                    "bws": bws_freq if bws_freq > 0 else "",
-                    "status": status,
-                }
-            )
-
-            # Логировать только первые 5 и последние 5 результатов
-            if len(rows) <= 5 or len(rows) > len(self.phrases) - 5:
-                if has_data:
-                    log_parts = []
-                    if ws_freq > 0:
-                        log_parts.append(f"WS={ws_freq}")
-                    if qws_freq > 0:
-                        log_parts.append(f"\"WS\"={qws_freq}")
-                    if bws_freq > 0:
-                        log_parts.append(f"!WS={bws_freq}")
-                    self._log(f"  {phrase}: {', '.join(log_parts)}", "DATA")
-
-        self._log(f"✅ Турбо-парсинг завершён успешно", "SUCCESS")
-        return rows
+            # Запускаем все задачи параллельно
+            loop.run_until_complete(self._run_all_parsers())
+        finally:
+            loop.close()
+            
+        # Собираем все результаты
+        all_results = []
+        for task in self.tasks:
+            if task.results:
+                for phrase, freq in task.results.items():
+                    all_results.append({
+                        "phrase": phrase,
+                        "ws": freq if isinstance(freq, (int, str)) else freq.get("ws", 0),
+                        "qws": freq.get("qws", 0) if isinstance(freq, dict) else 0,
+                        "bws": freq.get("bws", 0) if isinstance(freq, dict) else 0,
+                        "status": "OK",
+                        "profile": task.profile_email,
+                    })
+                    
+        self._write_log("=" * 70)
+        self._write_log(f"✅ ВСЕ ЗАДАЧИ ЗАВЕРШЕНЫ")
+        self._write_log(f"📊 Всего результатов: {len(all_results)}")
+        self._write_log("=" * 70)
+        
+        self.all_finished.emit(all_results)
+    
+    async def _run_all_parsers(self):
+        """Запуск всех парсеров асинхронно"""
+        tasks_coro = []
+        
+        for task in self.tasks:
+            if self._stop_requested:
+                break
+                
+            # Создаем корутину для каждого профиля
+            tasks_coro.append(self._run_single_parser(task))
+            
+        # Запускаем все корутины параллельно
+        results = await asyncio.gather(*tasks_coro, return_exceptions=True)
+        
+        # Обрабатываем результаты
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                self._write_log(f"❌ Ошибка в профиле {self.tasks[i].profile_email}: {str(result)}")
+    
+    async def _run_single_parser(self, task: SingleParsingTask):
+        """Запуск одного парсера"""
+        self._write_log(f"▶️ Запуск парсера для {task.profile_email}")
+        
+        # Подписываемся на логи задачи
+        def log_callback(msg, level):
+            full_msg = task.log(msg, level)
+            self._write_log(full_msg)
+            self.profile_log_signal.emit(task.profile_email, full_msg)
+        
+        # Запускаем парсинг
+        await task.run()
+        
+        # Отправляем логи задачи
+        for log_line in task.logs:
+            self._write_log(log_line)
+            self.profile_log_signal.emit(task.profile_email, log_line)
+        
+        # Уведомляем о завершении
+        self.task_completed.emit(task.profile_email, task.results)
+        
+        return task.results
 
 
 class ParsingTab(QWidget):
-    """Упрощённая вкладка «Парсинг»: частотность + подготовка данных."""
-
-    def __init__(self, parent: QWidget | None = None, keys_panel: KeysPanel | None = None) -> None:
+    """Улучшенная вкладка парсинга с поддержкой многопоточности"""
+    
+    def __init__(self, parent: QWidget | None = None, keys_panel: KeysPanel | None = None):
         super().__init__(parent)
-        self._worker: Optional[ParsingWorker] = None
+        self._worker = None
         self._keys_panel = keys_panel
-        self._current_profile: Optional[str] = None
-        self._profile_context: Optional[dict] = None
+        self._init_ui()
+        self._wire_signals()
+        self._refresh_profiles()
+        self._restore_session_state()
 
-        splitter = QSplitter(Qt.Horizontal)
-        splitter.setChildrenCollapsible(False)
-
-        # Левая панель: режимы, глубина, регионы, профиль
-        left = QWidget()
-        left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-
-        modes_box = QGroupBox("Режимы частотности (Wordstat)")
+    def _init_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        
+        # Верхняя панель с настройками
+        top_panel = QHBoxLayout()
+        
+        # Группа: Профили
+        grp_profiles = QGroupBox("Профили для парсинга")
+        profiles_layout = QVBoxLayout()
+        
+        # Список профилей с чекбоксами
+        self.profiles_list = QListWidget()
+        self.profiles_list.setMaximumHeight(150)
+        profiles_layout.addWidget(QLabel("Выберите профили:"))
+        profiles_layout.addWidget(self.profiles_list)
+        
+        # Кнопки управления
+        profiles_buttons = QHBoxLayout()
+        self.btn_select_all = QPushButton("Выбрать все")
+        self.btn_deselect_all = QPushButton("Снять все")
+        self.btn_refresh_profiles = QPushButton("Обновить")
+        profiles_buttons.addWidget(self.btn_select_all)
+        profiles_buttons.addWidget(self.btn_deselect_all)
+        profiles_buttons.addWidget(self.btn_refresh_profiles)
+        profiles_layout.addLayout(profiles_buttons)
+        
+        grp_profiles.setLayout(profiles_layout)
+        top_panel.addWidget(grp_profiles)
+        
+        # Группа: Режимы
+        grp_modes = QGroupBox("Режимы частотности")
+        modes_layout = QVBoxLayout()
         self.chk_ws = QCheckBox("WS (базовая)")
         self.chk_ws.setChecked(True)
         self.chk_qws = QCheckBox('"WS" (в кавычках)')
         self.chk_bws = QCheckBox("!WS (точная)")
-        modes_layout = QVBoxLayout(modes_box)
         modes_layout.addWidget(self.chk_ws)
         modes_layout.addWidget(self.chk_qws)
         modes_layout.addWidget(self.chk_bws)
-
-        depth_box = QGroupBox("Парсинг вглубь")
-        self.chk_depth = QCheckBox("Включить")
-        self.spn_pages = QSpinBox()
-        self.spn_pages.setRange(1, 40)
-        self.spn_pages.setValue(10)
-        self.chk_left = QCheckBox("Левая колонка")
-        self.chk_right = QCheckBox("Правая колонка")
-        depth_layout = QHBoxLayout(depth_box)
-        depth_layout.addWidget(self.chk_depth)
-        depth_layout.addWidget(QLabel("Страниц:"))
-        depth_layout.addWidget(self.spn_pages)
-        depth_layout.addWidget(self.chk_left)
-        depth_layout.addWidget(self.chk_right)
-
-        geo_box = QGroupBox("Регионы (дерево)")
+        grp_modes.setLayout(modes_layout)
+        top_panel.addWidget(grp_modes)
+        
+        # Группа: Регионы
+        grp_geo = QGroupBox("Регионы")
+        geo_layout = QVBoxLayout()
         self.geo_tree = GeoTree()
-        geo_layout = QVBoxLayout(geo_box)
+        self.geo_tree.setMaximumHeight(120)
         geo_layout.addWidget(self.geo_tree)
-
-        profile_box = QGroupBox("Аккаунт / профиль")
-        self.cmb_profile = QComboBox()
-        self.cmb_profile.addItems(["Текущий", "Все по очереди"])
-        profile_layout = QVBoxLayout(profile_box)
-        profile_layout.addWidget(self.cmb_profile)
-
-        left_layout.addWidget(modes_box)
-        left_layout.addWidget(depth_box)
-        left_layout.addWidget(geo_box, 1)
-        left_layout.addWidget(profile_box)
-
-        # Центр: ввод фраз + таблица результатов
-        center = QWidget()
-        center_layout = QVBoxLayout(center)
-        center_layout.setContentsMargins(0, 0, 0, 0)
-
+        grp_geo.setLayout(geo_layout)
+        top_panel.addWidget(grp_geo)
+        
+        layout.addLayout(top_panel)
+        
+        # Разделитель
+        splitter = QSplitter(Qt.Vertical)
+        
+        # Верхняя часть - фразы и результаты
+        top_widget = QWidget()
+        top_layout = QVBoxLayout(top_widget)
+        
+        # Фразы
+        phrases_group = QGroupBox("Фразы для парсинга")
+        phrases_layout = QVBoxLayout()
         self.phrases_edit = QTextEdit()
-        self.phrases_edit.setPlaceholderText("Введите ключевые фразы (по одной на строку)…")
-        self.phrases_edit.setMaximumHeight(150)
-
-        controls = QHBoxLayout()
-        self.btn_run = QPushButton("▶ Запустить парсинг")
-        self.btn_stop = QPushButton("■ Остановить")
+        self.phrases_edit.setPlaceholderText("Введите фразы (каждая с новой строки)")
+        phrases_layout.addWidget(self.phrases_edit)
+        
+        # Кнопки управления
+        control_buttons = QHBoxLayout()
+        self.btn_run = QPushButton("🚀 Запустить многопоточный парсинг")
+        self.btn_run.setStyleSheet("QPushButton { font-weight: bold; padding: 10px; }")
+        self.btn_stop = QPushButton("⏹ Остановить")
         self.btn_stop.setEnabled(False)
-        self.btn_export = QPushButton("💾 Экспорт в CSV")
-        controls.addWidget(self.btn_run)
-        controls.addWidget(self.btn_stop)
-        controls.addWidget(self.btn_export)
-        controls.addStretch()
-
+        self.btn_export = QPushButton("💾 Экспорт результатов")
+        
+        control_buttons.addWidget(self.btn_run)
+        control_buttons.addWidget(self.btn_stop)
+        control_buttons.addWidget(self.btn_export)
+        phrases_layout.addLayout(control_buttons)
+        
+        # Прогресс
         self.progress = QProgressBar()
         self.progress.setVisible(False)
-
-        self.table = QTableWidget(0, 7)
-        self.table.setHorizontalHeaderLabels(["Фраза", "WS", '"WS"', "!WS", "Статус", "Время", "Действия"])
-        self.table.verticalHeader().setVisible(False)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setAlternatingRowColors(True)
-
-        center_layout.addWidget(QLabel("Ключевые фразы для парсинга:"))
-        center_layout.addWidget(self.phrases_edit)
-        center_layout.addLayout(controls)
-        center_layout.addWidget(self.progress)
-        center_layout.addWidget(QLabel("Результаты:"))
-        center_layout.addWidget(self.table, 1)
-
-        # Журнал активностей
-        center_layout.addWidget(QLabel("Журнал активностей:"))
+        phrases_layout.addWidget(self.progress)
+        
+        phrases_group.setLayout(phrases_layout)
+        top_layout.addWidget(phrases_group)
+        
+        # Таблица результатов
+        results_group = QGroupBox("Результаты парсинга")
+        results_layout = QVBoxLayout()
+        
+        self.table = QTableWidget()
+        self.table.setColumnCount(8)
+        self.table.setHorizontalHeaderLabels([
+            "Фраза", "WS", '"WS"', "!WS", "Статус", "Профиль", "Время", "Действия"
+        ])
+        results_layout.addWidget(self.table)
+        
+        results_group.setLayout(results_layout)
+        top_layout.addWidget(results_group)
+        
+        splitter.addWidget(top_widget)
+        
+        # Нижняя часть - журнал активности
+        log_group = QGroupBox("📋 Журнал активности (логи всех профилей)")
+        log_layout = QVBoxLayout()
+        
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
-        self.log_text.setMaximumHeight(120)
-        self.log_text.setStyleSheet("QTextEdit { font-family: 'Consolas', 'Courier New', monospace; font-size: 9pt; }")
-        center_layout.addWidget(self.log_text)
-
-        splitter.addWidget(left)
-        splitter.addWidget(center)
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 3)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        self.log_text.setMaximumHeight(200)
+        self.log_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #1e1e1e;
+                color: #00ff00;
+                font-family: 'Consolas', 'Monaco', monospace;
+                font-size: 10pt;
+            }
+        """)
+        log_layout.addWidget(self.log_text)
+        
+        # Кнопка очистки логов
+        self.btn_clear_log = QPushButton("Очистить журнал")
+        log_layout.addWidget(self.btn_clear_log)
+        
+        log_group.setLayout(log_layout)
+        splitter.addWidget(log_group)
+        
+        # Устанавливаем пропорции разделителя
+        splitter.setSizes([400, 200])
+        
         layout.addWidget(splitter)
-
-        self._wire_signals()
-        self.refresh_profiles()
-
-    # ------------------------------------------------------------------ API
-    def set_keys_panel(self, panel: KeysPanel) -> None:
-        self._keys_panel = panel
-
-    def append_phrases(self, phrases: list[str]) -> None:
-        existing = self.phrases_edit.toPlainText().splitlines()
-        merged = existing + [phrase for phrase in phrases if phrase.strip()]
-        self.phrases_edit.setPlainText("\n".join(sorted(set(phrase.strip() for phrase in merged if phrase.strip()))))
-
-    def refresh_profiles(self) -> None:
-        profiles = list_profiles()
-        previous = self._current_profile
-        self.cmb_profile.blockSignals(True)
-        self.cmb_profile.clear()
-        if profiles:
-            self.cmb_profile.addItems(profiles)
-            if previous and previous in profiles:
-                index = profiles.index(previous)
-            else:
-                index = 0
-            self.cmb_profile.setCurrentIndex(index)
-            self._current_profile = profiles[index]
-        else:
-            self.cmb_profile.addItem("Текущий")
-            self._current_profile = None
-        self.cmb_profile.blockSignals(False)
-        self._update_profile_context()
-
-    def get_all_available_accounts(self) -> list[dict]:
-        """Получить ВСЕ аккаунты из БД с профилями и прокси."""
+        
+    def _wire_signals(self):
+        """Подключение сигналов"""
+        self.btn_run.clicked.connect(self._on_run_clicked)
+        self.btn_stop.clicked.connect(self._on_stop_clicked)
+        self.btn_export.clicked.connect(self._on_export_clicked)
+        self.btn_select_all.clicked.connect(self._select_all_profiles)
+        self.btn_deselect_all.clicked.connect(self._deselect_all_profiles)
+        self.btn_refresh_profiles.clicked.connect(self._refresh_profiles)
+        self.btn_clear_log.clicked.connect(self.log_text.clear)
+        
+    def _refresh_profiles(self):
+        """Обновить список профилей"""
+        self.profiles_list.clear()
+        
         try:
-            accounts_list = list_accounts()
-            result = []
-            for acc in accounts_list:
-                if hasattr(acc, 'profile_path') and acc.profile_path:
-                    result.append({
-                        "email": acc.name,
-                        "proxy": acc.proxy if hasattr(acc, 'proxy') else None,
-                        "profile_path": acc.profile_path,
-                    })
-            return result
-        except Exception as e:
-            print(f"[ERROR] Cannot get accounts: {e}")
-            return []
+            accounts = list_accounts()
+            for account in accounts:
+                raw_profile_path = getattr(account, "profile_path", "") or ""
+                if not raw_profile_path:
+                    continue
+                profile_path = Path(raw_profile_path)
+                if not profile_path.is_absolute():
+                    profile_path = (BASE_DIR / profile_path).resolve()
+                else:
+                    profile_path = profile_path.resolve()
 
-    def save_session_state(self, partial_results: dict = None) -> None:
-        """Сохранить состояние парсинга для восстановления."""
-        session_file = Path("C:/AI/yandex/keyset/logs/parsing_session.json")
-        session_file.parent.mkdir(parents=True, exist_ok=True)
+                proxy_value = getattr(account, "proxy", None)
+
+                item = QListWidgetItem(f"📧 {account.name}")
+                item.setCheckState(Qt.Unchecked)
+                item.setData(Qt.UserRole, {
+                    'email': account.name,
+                    'proxy': proxy_value.strip() if isinstance(proxy_value, str) else proxy_value,
+                    'profile_path': str(profile_path),
+                })
+                self.profiles_list.addItem(item)
+                    
+            self._append_log(f"✅ Загружено профилей: {self.profiles_list.count()}")
+        except Exception as e:
+            self._append_log(f"❌ Ошибка загрузки профилей: {str(e)}")
+            
+    def _select_all_profiles(self):
+        """Выбрать все профили"""
+        for i in range(self.profiles_list.count()):
+            self.profiles_list.item(i).setCheckState(Qt.Checked)
+            
+    def _deselect_all_profiles(self):
+        """Снять выделение со всех профилей"""
+        for i in range(self.profiles_list.count()):
+            self.profiles_list.item(i).setCheckState(Qt.Unchecked)
+            
+    def _get_selected_profiles(self) -> List[dict]:
+        """Получить выбранные профили"""
+        selected = []
+        for i in range(self.profiles_list.count()):
+            item = self.profiles_list.item(i)
+            if item.checkState() == Qt.Checked:
+                selected.append(item.data(Qt.UserRole))
+        return selected
+
+    def save_session_state(self, partial_results: List[Dict[str, Any]] | None = None) -> None:
+        """Сохранить состояние парсинга, чтобы восстановить его при следующем запуске."""
+        try:
+            SESSION_FILE.parent.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:  # pragma: no cover - best effort
+            print(f"[ERROR] Failed to prepare session directory: {exc}")
+            return
 
         phrases = [line.strip() for line in self.phrases_edit.toPlainText().splitlines() if line.strip()]
-
-        state = {
+        state: Dict[str, Any] = {
             "timestamp": datetime.now().isoformat(),
             "phrases": phrases,
             "modes": {
@@ -477,174 +474,282 @@ class ParsingTab(QWidget):
                 "bws": self.chk_bws.isChecked(),
             },
             "geo_ids": self.geo_tree.selected_geo_ids(),
-            "profile": self._current_profile,
-            "partial_results": partial_results or {},
+            "selected_profiles": self._get_selected_profiles(),
         }
+        if partial_results is not None:
+            state["partial_results"] = partial_results
 
         try:
-            with open(session_file, "w", encoding="utf-8") as f:
-                json.dump(state, f, ensure_ascii=False, indent=2)
-            print(f"[SESSION] Состояние сохранено: {session_file}")
-        except Exception as e:
-            print(f"[ERROR] Failed to save session: {e}")
+            with SESSION_FILE.open("w", encoding="utf-8") as fh:
+                json.dump(state, fh, ensure_ascii=False, indent=2)
+        except Exception as exc:
+            print(f"[ERROR] Failed to save session: {exc}")
 
-    def load_session_state(self) -> dict | None:
-        """Загрузить сохранённое состояние."""
-        session_file = Path("C:/AI/yandex/keyset/logs/parsing_session.json")
-
-        if not session_file.exists():
+    def load_session_state(self) -> Dict[str, Any] | None:
+        """Загрузить сохранённое состояние парсинга, если оно доступно."""
+        if not SESSION_FILE.exists():
             return None
-
         try:
-            with open(session_file, "r", encoding="utf-8") as f:
-                state = json.load(f)
-            print(f"[SESSION] Состояние загружено: {session_file}")
-            return state
-        except Exception as e:
-            print(f"[ERROR] Failed to load session: {e}")
+            with SESSION_FILE.open("r", encoding="utf-8") as fh:
+                return json.load(fh)
+        except Exception as exc:
+            print(f"[ERROR] Failed to load session: {exc}")
             return None
 
-    # ------------------------------------------------------------------ slots
-    def _wire_signals(self) -> None:
-        self.btn_run.clicked.connect(self._on_run_clicked)
-        self.btn_stop.clicked.connect(self._on_stop_clicked)
-        self.btn_export.clicked.connect(self._on_export_clicked)
-        self.cmb_profile.currentTextChanged.connect(self._on_profile_changed)
-
-    def _on_profile_changed(self, value: str) -> None:
-        self._current_profile = value or None
-        self._update_profile_context()
-
-    def _update_profile_context(self) -> None:
-        context = get_profile_ctx(self._current_profile) if self._current_profile else get_profile_ctx(None)
-        self._profile_context = context or {"storage_state": None, "proxy": None}
-
-    def _on_run_clicked(self) -> None:
-        phrases = [line.strip() for line in self.phrases_edit.toPlainText().splitlines() if line.strip()]
-        if not phrases:
+    def _restore_session_state(self) -> None:
+        """Восстановить состояние парсинга после перезапуска приложения."""
+        state = self.load_session_state()
+        if not state:
             return
 
+        phrases = state.get("phrases") or []
+        if phrases:
+            self.phrases_edit.setPlainText("\n".join(phrases))
+
+        modes = state.get("modes") or {}
+        self.chk_ws.setChecked(bool(modes.get("ws", True)))
+        self.chk_qws.setChecked(bool(modes.get("qws", False)))
+        self.chk_bws.setChecked(bool(modes.get("bws", False)))
+
+        saved_profiles = state.get("selected_profiles") or []
+        saved_emails = {profile.get("email") for profile in saved_profiles if profile.get("email")}
+        for i in range(self.profiles_list.count()):
+            item = self.profiles_list.item(i)
+            data = item.data(Qt.UserRole) or {}
+            if data.get("email") in saved_emails:
+                item.setCheckState(Qt.Checked)
+
+        partial_results = state.get("partial_results") or []
+        if isinstance(partial_results, list):
+            self._populate_results(partial_results)
+
+    @staticmethod
+    def _coerce_freq(value: Any) -> int:
+        if value is None:
+            return 0
+        if isinstance(value, bool):
+            return int(value)
+        if isinstance(value, (int, float)):
+            return int(value)
+        if isinstance(value, str):
+            stripped = value.strip().replace(" ", "")
+            if not stripped:
+                return 0
+            try:
+                return int(float(stripped))
+            except ValueError:
+                return 0
+        return 0
+
+    def _aggregate_by_phrase(self, rows: List[Dict[str, Any]]) -> Dict[str, Dict[str, int]]:
+        aggregated: Dict[str, Dict[str, int]] = {}
+        for record in rows:
+            phrase = str(record.get("phrase", "")).strip()
+            if not phrase:
+                continue
+            entry = aggregated.setdefault(phrase, {"ws": 0, "qws": 0, "bws": 0})
+            entry["ws"] = max(entry["ws"], self._coerce_freq(record.get("ws")))
+            entry["qws"] = max(entry["qws"], self._coerce_freq(record.get("qws")))
+            entry["bws"] = max(entry["bws"], self._coerce_freq(record.get("bws")))
+        return aggregated
+
+    def _populate_results(self, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Отобразить результаты в таблице, обновить панели и вернуть нормализованные строки."""
+        normalized_rows: List[Dict[str, Any]] = []
+        self.table.setRowCount(0)
+
+        for record in rows:
+            phrase = str(record.get("phrase", ""))
+            ws_value = record.get("ws", "")
+            qws_value = record.get("qws", "")
+            bws_value = record.get("bws", "")
+            status_value = record.get("status", "")
+            profile_value = record.get("profile", "")
+            timestamp_value = record.get("time") or time.strftime("%H:%M:%S")
+
+            row_idx = self.table.rowCount()
+            self.table.insertRow(row_idx)
+            values = [
+                phrase,
+                str(ws_value) if ws_value is not None else "",
+                str(qws_value) if qws_value is not None else "",
+                str(bws_value) if bws_value is not None else "",
+                str(status_value),
+                str(profile_value),
+                str(timestamp_value),
+                "⋯",
+            ]
+            for col, value in enumerate(values):
+                self.table.setItem(row_idx, col, QTableWidgetItem(value))
+
+            normalized_rows.append(
+                {
+                    "phrase": phrase,
+                    "ws": values[1],
+                    "qws": values[2],
+                    "bws": values[3],
+                    "status": values[4],
+                    "profile": values[5],
+                    "time": values[6],
+                }
+            )
+
+        if self._keys_panel:
+            groups = defaultdict(list)
+            aggregated = self._aggregate_by_phrase(normalized_rows)
+            for phrase, metrics in aggregated.items():
+                group_name = phrase.split()[0] if phrase else "Прочее"
+                groups[group_name].append(
+                    {
+                        "phrase": phrase,
+                        "freq_total": metrics["ws"],
+                        "freq_quotes": metrics["qws"],
+                        "freq_exact": metrics["bws"],
+                    }
+                )
+            self._keys_panel.load_groups(groups)
+
+        return normalized_rows
+        
+    def _on_run_clicked(self):
+        """Запуск многопоточного парсинга"""
+        # Получаем фразы
+        phrases = [line.strip() for line in self.phrases_edit.toPlainText().splitlines() if line.strip()]
+        if not phrases:
+            self._append_log("❌ Нет фраз для парсинга")
+            return
+            
+        # Получаем выбранные профили
+        selected_profiles = self._get_selected_profiles()
+        if not selected_profiles:
+            self._append_log("❌ Не выбраны профили для парсинга")
+            return
+            
+        # Режимы парсинга
         modes = {
             "ws": self.chk_ws.isChecked(),
             "qws": self.chk_qws.isChecked(),
             "bws": self.chk_bws.isChecked(),
         }
-        depth_cfg = {
-            "enabled": self.chk_depth.isChecked(),
-            "pages": self.spn_pages.value(),
-            "left": self.chk_left.isChecked(),
-            "right": self.chk_right.isChecked(),
-        }
+        
+        # Регионы
         geo_ids = self.geo_tree.selected_geo_ids()
-
+        
+        # Обновляем UI
         self.btn_run.setEnabled(False)
         self.btn_stop.setEnabled(True)
         self.progress.setVisible(True)
         self.progress.setValue(0)
         self.table.setRowCount(0)
-
-        mode = "freq"
-        self._worker = ParsingWorker(
-            mode,
-            phrases,
-            modes,
-            depth_cfg,
-            geo_ids,
-            self._current_profile,
-            self._profile_context,
-            self,
+        
+        # Логируем начало
+        self._append_log("=" * 70)
+        self._append_log(f"🚀 ЗАПУСК МНОГОПОТОЧНОГО ПАРСИНГА")
+        self._append_log(f"📊 Профилей: {len(selected_profiles)}")
+        self._append_log(f"📝 Фраз: {len(phrases)}")
+        self._append_log("=" * 70)
+        
+        # Создаем многопоточный воркер
+        self._worker = MultiParsingWorker(
+            phrases=phrases,
+            modes=modes,
+            geo_ids=geo_ids,
+            selected_profiles=selected_profiles,
+            parent=self
         )
-        self._worker.tick.connect(self._on_worker_tick)
-        self._worker.finished.connect(self._on_worker_finished)
+        
+        # Подключаем сигналы
         self._worker.log_signal.connect(self._append_log)
+        self._worker.profile_log_signal.connect(self._on_profile_log)
+        self._worker.progress_signal.connect(self._on_progress_update)
+        self._worker.task_completed.connect(self._on_task_completed)
+        self._worker.all_finished.connect(self._on_all_finished)
+        
+        # Запускаем
+        self.save_session_state()
         self._worker.start()
-
-    def _on_stop_clicked(self) -> None:
+        
+    def _on_stop_clicked(self):
+        """Остановка парсинга"""
         if self._worker:
             self._worker.stop()
             self._worker = None
         self.btn_run.setEnabled(True)
         self.btn_stop.setEnabled(False)
         self.progress.setVisible(False)
-
-    def _on_worker_tick(self, data: dict) -> None:
-        self.progress.setValue(data.get("progress", 0))
-
-    def _append_log(self, message: str) -> None:
-        """Добавить лог в журнал активностей."""
+        self._append_log("⏹ Парсинг остановлен пользователем")
+        
+    def _append_log(self, message: str):
+        """Добавить сообщение в журнал активности"""
         self.log_text.append(message)
-        # Прокрутить вниз к последнему сообщению
+        # Автопрокрутка вниз
         scrollbar = self.log_text.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
-
-    def _on_worker_finished(self, rows: list[dict]) -> None:
+        
+    def _on_profile_log(self, profile_email: str, message: str):
+        """Обработка лога от конкретного профиля"""
+        # Можно добавить цветовое выделение для разных профилей
+        pass
+        
+    def _on_progress_update(self, progress_data: dict):
+        """Обновление прогресса"""
+        # Вычисляем общий прогресс
+        if progress_data:
+            total_progress = sum(progress_data.values()) / len(progress_data)
+            self.progress.setValue(int(total_progress))
+            
+    def _on_task_completed(self, profile_email: str, results: dict):
+        """Обработка завершения задачи одного профиля"""
+        self._append_log(f"✅ Профиль {profile_email} завершил парсинг. Результатов: {len(results)}")
+        
+    def _on_all_finished(self, all_results: List[dict]):
+        """Все задачи завершены"""
         self._worker = None
         self.btn_run.setEnabled(True)
         self.btn_stop.setEnabled(False)
         self.progress.setVisible(False)
 
-        self.table.setRowCount(0)
-        for record in rows:
-            row_idx = self.table.rowCount()
-            self.table.insertRow(row_idx)
-            values = [
-                record.get("phrase", ""),
-                record.get("ws", ""),
-                record.get("qws", ""),
-                record.get("bws", ""),
-                record.get("status", ""),
-                time.strftime("%H:%M:%S"),
-                "⋯",
-            ]
-            for col, value in enumerate(values):
-                self.table.setItem(row_idx, col, QTableWidgetItem(str(value)))
+        normalized_rows = self._populate_results(all_results)
 
-        if self._keys_panel:
-            groups = defaultdict(list)
-            for record in rows:
-                phrase = record.get("phrase", "")
-                group_name = phrase.split()[0] if phrase else "Прочее"
-                groups[group_name].append(
-                    {
-                        "phrase": phrase,
-                        "freq_total": record.get("ws", 0),
-                        "freq_quotes": record.get("qws", 0),
-                        "freq_exact": record.get("bws", 0),
-                    }
-                )
-            self._keys_panel.load_groups(groups)
+        self._append_log("=" * 70)
+        self._append_log(f"✅ ПАРСИНГ ЗАВЕРШЕН")
+        self._append_log(f"📊 Всего результатов: {len(normalized_rows)}")
+        self._append_log("=" * 70)
 
-        # Сохранить состояние сессии с результатами
-        partial_results = {
-            record.get("phrase", ""): {
-                "ws": record.get("ws", 0),
-                "qws": record.get("qws", 0),
-                "bws": record.get("bws", 0),
-                "status": record.get("status", ""),
-            }
-            for record in rows
-        }
-        self.save_session_state(partial_results=partial_results)
-
-    def _on_export_clicked(self) -> None:
-        filename, _ = QFileDialog.getSaveFileName(self, "Экспорт в CSV", "keyset_export.csv", "CSV files (*.csv)")
-        if not filename:
+        self.save_session_state(partial_results=normalized_rows)
+        
+    def _on_export_clicked(self):
+        """Экспорт результатов"""
+        if self.table.rowCount() == 0:
+            self._append_log("❌ Нет результатов для экспорта")
             return
-
-        rows = []
-        for r in range(self.table.rowCount()):
-            row = []
-            for c in range(self.table.columnCount() - 1):
-                item = self.table.item(r, c)
-                row.append(item.text() if item else "")
-            rows.append(row)
-
-        import csv
-
-        with open(filename, "w", newline="", encoding="utf-8-sig") as handle:
-            writer = csv.writer(handle, delimiter=";")
-            writer.writerow(["Фраза", "WS", '"WS"', "!WS", "Статус", "Время"])
-            writer.writerows(rows)
-
-
-__all__ = ["ParsingTab"]
+            
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Экспорт результатов",
+            f"parsing_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            "CSV Files (*.csv);;All Files (*)"
+        )
+        
+        if file_path:
+            try:
+                import csv
+                with open(file_path, 'w', newline='', encoding='utf-8-sig') as f:
+                    writer = csv.writer(f)
+                    # Заголовки
+                    headers = []
+                    for col in range(self.table.columnCount()):
+                        headers.append(self.table.horizontalHeaderItem(col).text())
+                    writer.writerow(headers)
+                    
+                    # Данные
+                    for row in range(self.table.rowCount()):
+                        row_data = []
+                        for col in range(self.table.columnCount()):
+                            item = self.table.item(row, col)
+                            row_data.append(item.text() if item else "")
+                        writer.writerow(row_data)
+                        
+                self._append_log(f"✅ Результаты экспортированы: {file_path}")
+            except Exception as e:
+                self._append_log(f"❌ Ошибка экспорта: {str(e)}")
