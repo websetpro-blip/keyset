@@ -76,6 +76,8 @@ def ensure_schema() -> None:
             if 'proxy_strategy' not in columns:
                 conn.execute(text("ALTER TABLE accounts ADD COLUMN proxy_strategy VARCHAR(32) DEFAULT 'fixed'"))
                 conn.execute(text("UPDATE accounts SET proxy_strategy = 'fixed' WHERE proxy_strategy IS NULL"))
+            if 'cookies' not in columns:
+                conn.execute(text("ALTER TABLE accounts ADD COLUMN cookies TEXT"))
 
     if not inspector.has_table('tasks'):
         return

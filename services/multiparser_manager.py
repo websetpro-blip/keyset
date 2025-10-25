@@ -17,17 +17,94 @@ from typing import Dict, List, Optional, Tuple, Any
 import threading
 from queue import Queue
 
+from playwright.async_api import BrowserContext
+from sqlalchemy import select
+
+try:
+    from ..core.db import SessionLocal
+    from ..core.models import Account
+except ImportError:  # pragma: no cover - fallback for scripts
+    from core.db import SessionLocal  # type: ignore
+    from core.models import Account  # type: ignore
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+KEYSET_ROOT = Path(__file__).resolve().parents[1]
+LOG_DIR = KEYSET_ROOT / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+RESULTS_DIR = KEYSET_ROOT / "results"
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
 # Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('C:/AI/yandex/keyset/logs/multiparser.log', encoding='utf-8'),
+        logging.FileHandler(str(LOG_DIR / 'multiparser.log'), encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
 
 logger = logging.getLogger('MultiParser')
+
+async def load_cookies_from_db_to_context(
+    context: BrowserContext,
+    account_name: str,
+    logger_obj: Optional[logging.Logger] = None,
+) -> bool:
+    """Загрузить куки из БД и добавить их в контекст браузера."""
+    log = logger_obj or logger
+    try:
+        with SessionLocal() as session:
+            stmt = select(Account).where(Account.name == account_name)
+            account = session.execute(stmt).scalar_one_or_none()
+            if not account or not getattr(account, "cookies", None):
+                log.info(f"[{account_name}] Куки в БД не найдены")
+                return False
+
+            raw_cookies = account.cookies
+            cookies_payload: Any
+            try:
+                cookies_payload = json.loads(raw_cookies) if isinstance(raw_cookies, str) else raw_cookies
+            except json.JSONDecodeError:
+                log.error(f"[{account_name}] Некорректный формат куки в БД")
+                return False
+
+            if not isinstance(cookies_payload, list):
+                log.error(f"[{account_name}] Ожидался список куки, получено {type(cookies_payload)}")
+                return False
+
+            if not cookies_payload:
+                log.info(f"[{account_name}] Список куки пуст")
+                return False
+
+            await context.add_cookies(cookies_payload)
+            log.info(f"[{account_name}] ✓ Загружено {len(cookies_payload)} куки из БД")
+            return True
+    except Exception as exc:
+        log.error(f"[{account_name}] Ошибка загрузки куки из БД: {exc}")
+        return False
+
+
+async def save_cookies_to_db(
+    account_name: str,
+    context: BrowserContext,
+    logger_obj: Optional[logging.Logger] = None,
+) -> None:
+    """Сохранить текущие куки из контекста браузера в базу данных."""
+    log = logger_obj or logger
+    try:
+        cookies = await context.cookies()
+        with SessionLocal() as session:
+            stmt = select(Account).where(Account.name == account_name)
+            account = session.execute(stmt).scalar_one_or_none()
+            if not account:
+                log.warning(f"[{account_name}] Не удалось найти аккаунт для сохранения куки")
+                return
+            account.cookies = json.dumps(cookies, ensure_ascii=False)
+            session.commit()
+            log.info(f"[{account_name}] ✓ Куки сохранены в БД ({len(cookies)} шт)")
+    except Exception as exc:
+        log.error(f"[{account_name}] Ошибка сохранения куки в БД: {exc}")
 
 
 @dataclass
@@ -81,10 +158,10 @@ class MultiParserManager:
         self._lock = threading.Lock()
         
         # Директории для сохранения результатов
-        self.results_dir = Path("C:/AI/yandex/keyset/results")
+        self.results_dir = RESULTS_DIR
         self.results_dir.mkdir(parents=True, exist_ok=True)
         
-        self.logs_dir = Path("C:/AI/yandex/keyset/logs")
+        self.logs_dir = LOG_DIR
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         
     def create_task(
@@ -169,7 +246,7 @@ class MultiParserManager:
             try:
                 # Импортируем парсер
                 import sys
-                turbo_path = Path("C:/AI/yandex")
+                turbo_path = PROJECT_ROOT
                 if str(turbo_path) not in sys.path:
                     sys.path.insert(0, str(turbo_path))
                     
@@ -445,12 +522,12 @@ if __name__ == "__main__":
     test_profiles = [
         {
             'email': 'test1@example.com',
-            'profile_path': 'C:/AI/yandex/profiles/profile1',
+            'profile_path': str(PROJECT_ROOT / 'profiles/profile1'),
             'proxy': 'http://user:pass@proxy1.com:8080'
         },
         {
             'email': 'test2@example.com',
-            'profile_path': 'C:/AI/yandex/profiles/profile2',
+            'profile_path': str(PROJECT_ROOT / 'profiles/profile2'),
             'proxy': 'http://user:pass@proxy2.com:8080'
         }
     ]
@@ -482,3 +559,10 @@ if __name__ == "__main__":
         print("Timeout waiting for tasks")
         
     manager.stop()
+
+
+__all__ = [
+    "MultiParserManager",
+    "load_cookies_from_db_to_context",
+    "save_cookies_to_db",
+]

@@ -38,6 +38,17 @@ except ImportError:
         print("[WARNING] proxy module not available, using fallback parser")
         PROXY_MODULE_AVAILABLE = False
 
+try:
+    from keyset.services.multiparser_manager import (
+        load_cookies_from_db_to_context,
+        save_cookies_to_db,
+    )
+except ImportError:  # pragma: no cover - fallback for scripts
+    from services.multiparser_manager import (  # type: ignore
+        load_cookies_from_db_to_context,
+        save_cookies_to_db,
+    )
+
 # Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
@@ -126,6 +137,52 @@ def get_proxy_config(proxy_uri: Optional[str]) -> Optional[dict]:
     if config:
         logging.info(f"Proxy parsed (fallback): {config.get('server', 'unknown')}")
     return config
+
+
+def has_yandex_cookie(cookies: List[Dict[str, Any]]) -> bool:
+    """Проверить, содержат ли куки домены Яндекса."""
+    for cookie in cookies:
+        domain = cookie.get("domain", "") or ""
+        if "yandex" in domain:
+            return True
+    return False
+
+
+async def verify_authorization(page: Page, account_name: str, logger: logging.Logger) -> bool:
+    """Убедиться, что пользователь авторизован на Wordstat."""
+    try:
+        try:
+            await page.wait_for_selector('button:has-text("Выход")', timeout=3000)
+            logger.info(f"[{account_name}] ✓ Авторизация подтверждена (найдена кнопка 'Выход')")
+            return True
+        except Exception:
+            pass
+
+        current_url = page.url or ""
+        if "passport.yandex" in current_url or "login" in current_url:
+            logger.error(f"[{account_name}] ❌ Требуется авторизация (редирект на {current_url})")
+            return False
+
+        try:
+            profile_elem = await page.query_selector('[data-testid="profile"]')
+            if profile_elem:
+                logger.info(f"[{account_name}] ✓ Элемент профиля найден")
+                return True
+        except Exception:
+            pass
+
+        logger.warning(f"[{account_name}] ⚠️ Не удалось однозначно определить статус авторизации")
+        return False
+    except Exception as exc:
+        logger.error(f"[{account_name}] ⚠️ Ошибка проверки авторизации: {exc}")
+        return False
+
+
+def log_manual_authorization_instructions(logger: logging.Logger, account_name: str, profile_path: pathlib.Path) -> None:
+    """Подсказка пользователю по ручной авторизации."""
+    logger.info(f"[{account_name}] Пожалуйста, авторизуйтесь вручную в отдельном окне Chrome:")
+    logger.info(f"[{account_name}]   chrome --user-data-dir=\"{profile_path}\"")
+    logger.info(f"[{account_name}] После авторизации закройте окно и запустите парсинг повторно.")
 
 
 def load_phrases(path: pathlib.Path) -> List[str]:
@@ -243,18 +300,54 @@ class TurboParser:
             except Exception as e:
                 self.logger.error(f"Failed to launch browser: {e}")
                 raise
-            
-            # 2. СОЗДАНИЕ ВКЛАДОК
-            self.logger.info(f"[2/6] Создание {TABS_COUNT} вкладок...")
-            
+
+            page = context.pages[0] if context.pages else await context.new_page()
+            cookies = await context.cookies()
+            self.logger.info(f"[{self.account_name}] Куки в профиле: {len(cookies)} шт")
+
+            if not has_yandex_cookie(cookies):
+                self.logger.warning(f"[{self.account_name}] Куки Яндекс не найдены — пробую загрузить из БД")
+                loaded_from_db = await load_cookies_from_db_to_context(context, self.account_name, self.logger)
+                if loaded_from_db:
+                    cookies = await context.cookies()
+                else:
+                    self.logger.error(f"[{self.account_name}] ❌ Куки не загружены, может потребоваться ручная авторизация")
+            else:
+                self.logger.info(f"[{self.account_name}] ✓ Куки найдены, продолжаем")
+
+            self.logger.info(f"[{self.account_name}] Переход на Wordstat...")
+            try:
+                await page.goto(
+                    "https://wordstat.yandex.ru",
+                    wait_until="domcontentloaded",
+                    timeout=WORDSTAT_LOAD_TIMEOUT_MS,
+                )
+                await page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception as exc:
+                self.logger.error(f"[{self.account_name}] ❌ Ошибка загрузки Wordstat: {exc}")
+                await context.close()
+                return {}
+
+            if not await verify_authorization(page, self.account_name, self.logger):
+                self.logger.error(f"[{self.account_name}] ❌ Профиль не авторизован — парсинг остановлен")
+                log_manual_authorization_instructions(self.logger, self.account_name, self.profile_path)
+                await context.close()
+                return {}
+
+            pages: List[Page] = [page]
+            self.logger.info(f"[2/6] Создание дополнительных вкладок...")
+            self.logger.info("  [OK] Вкладка 1 готова")
+
             async def create_tab(index: int) -> Page:
-                page = await context.new_page()
-                self.logger.info(f"  [OK] Вкладка {index + 1} создана")
-                return page
-            
-            pages: List[Page] = await asyncio.gather(
-                *[create_tab(i) for i in range(TABS_COUNT)]
-            )
+                page_new = await context.new_page()
+                self.logger.info(f"  [OK] Вкладка {index} создана")
+                return page_new
+
+            if TABS_COUNT > 1:
+                additional_pages = await asyncio.gather(
+                    *[create_tab(i) for i in range(2, TABS_COUNT + 1)]
+                )
+                pages.extend(additional_pages)
             self.logger.info(f"[OK] Создано {len(pages)} вкладок\n")
             
             # 3. ЗАГРУЗКА WORDSTAT
@@ -438,6 +531,8 @@ class TurboParser:
                 for i, (page, phrases) in enumerate(zip(working_pages, tab_phrases_list))
             ]
             await asyncio.gather(*parse_tasks)
+
+            await save_cookies_to_db(self.account_name, context, self.logger)
             
             # Закрываем браузер
             await context.close()
