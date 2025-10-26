@@ -526,10 +526,22 @@ class ParsingTab(QWidget):
         selected = []
         try:
             accounts = list_accounts()
+            self._append_log(f"🔍 Загружено аккаунтов из БД: {len(accounts)}")
+
+            skipped = 0
             for account in accounts:
+                # Пропускаем служебные аккаунты
+                if account.name in ["demo_account", "wordstat_main"]:
+                    self._append_log(f"   ⏭ Пропущен служебный аккаунт: {account.name}")
+                    skipped += 1
+                    continue
+
                 raw_profile_path = getattr(account, "profile_path", "") or ""
                 if not raw_profile_path:
+                    self._append_log(f"   ⚠️ Пропущен {account.name}: нет profile_path")
+                    skipped += 1
                     continue
+
                 profile_path = Path(raw_profile_path)
                 if not profile_path.is_absolute():
                     profile_path = (BASE_DIR / profile_path).resolve()
@@ -543,8 +555,16 @@ class ParsingTab(QWidget):
                     'proxy': proxy_value.strip() if isinstance(proxy_value, str) else proxy_value,
                     'profile_path': str(profile_path),
                 })
+
+            self._append_log(f"✅ Выбрано профилей для парсинга: {len(selected)}")
+            if skipped > 0:
+                self._append_log(f"⏭ Пропущено аккаунтов: {skipped}")
+
         except Exception as e:
-            print(f"Ошибка загрузки профилей: {str(e)}")
+            error_msg = f"❌ Ошибка загрузки профилей: {str(e)}"
+            self._append_log(error_msg)
+            import traceback
+            self._append_log(traceback.format_exc())
 
         return selected
 
@@ -773,8 +793,48 @@ class ParsingTab(QWidget):
         self._append_log(f"🗑️ Таблица очищена ({row_count} строк удалено)")
 
     def _on_batch_parsing(self):
-        """Пакетный парсинг - заглушка"""
-        self._append_log("📦 Пакетный парсинг (в разработке)")
+        """Пакетный парсинг с выбором регионов"""
+        from ..dialogs.batch_collect_dialog import BatchCollectDialog
+
+        dialog = BatchCollectDialog(self)
+        dialog.collect_requested.connect(self._on_batch_collect_requested)
+        dialog.exec()
+
+    def _on_batch_collect_requested(self, phrases: List[str], settings: dict):
+        """Обработка запроса пакетного сбора фраз"""
+        self._append_log("=" * 70)
+        self._append_log("📦 ПАКЕТНЫЙ СБОР ФРАЗ")
+        self._append_log(f"📝 Фраз для сбора: {len(phrases)}")
+
+        # Регионы
+        geo_ids = settings.get("geo_ids", [225])
+        self._append_log(f"🌍 Регионы: {geo_ids}")
+
+        # Порог показов
+        threshold = settings.get("threshold", 20)
+        self._append_log(f"📊 Порог показов: {threshold}")
+
+        self._append_log("=" * 70)
+
+        # Добавляем фразы в таблицу
+        for phrase in phrases:
+            row_idx = self.table.rowCount()
+            self.table.insertRow(row_idx)
+
+            # № (номер строки)
+            self.table.setItem(row_idx, 0, QTableWidgetItem(str(row_idx + 1)))
+
+            # Фраза
+            self.table.setItem(row_idx, 1, QTableWidgetItem(phrase))
+
+            # Частотность (пусто)
+            self.table.setItem(row_idx, 2, QTableWidgetItem(""))
+
+            # Статус
+            self.table.setItem(row_idx, 3, QTableWidgetItem("⏱"))
+
+        self._append_log(f"✅ Фразы добавлены в таблицу: {len(phrases)}")
+        self._append_log("💡 Используйте кнопку '🚀 Запустить парсинг' для начала сбора")
 
     def _on_forecast(self):
         """Прогноз бюджета - заглушка"""
@@ -799,10 +859,11 @@ class ParsingTab(QWidget):
             self._append_log("❌ Нет фраз для парсинга (добавьте фразы через кнопку '➕ Добавить')")
             return
             
-        # Получаем выбранные профили
+        # Получаем профили из БД
         selected_profiles = self._get_selected_profiles()
         if not selected_profiles:
-            self._append_log("❌ Не выбраны профили для парсинга")
+            self._append_log("❌ Нет доступных профилей для парсинга!")
+            self._append_log("💡 Добавьте аккаунты во вкладке 'Аккаунты' с заполненным profile_path")
             return
 
         # Подробный отчёт перед стартом
