@@ -550,11 +550,15 @@ class ParsingTab(QWidget):
 
                 proxy_value = getattr(account, "proxy", None)
 
-                selected.append({
+                profile_data = {
                     'email': account.name,
                     'proxy': proxy_value.strip() if isinstance(proxy_value, str) else proxy_value,
                     'profile_path': str(profile_path),
-                })
+                }
+
+                # Логируем каждый выбранный профиль
+                self._append_log(f"   ✓ {account.name} → {str(profile_path)}")
+                selected.append(profile_data)
 
             self._append_log(f"✅ Выбрано профилей для парсинга: {len(selected)}")
             if skipped > 0:
@@ -907,10 +911,18 @@ class ParsingTab(QWidget):
         self._append_log(f"🚀 ЗАПУСК МНОГОПОТОЧНОГО ПАРСИНГА")
         self._append_log(f"📊 Профилей: {len(selected_profiles)}")
         self._append_log(f"📝 Фраз: {len(phrases)}")
+        self._append_log(f"🌍 Регионы: {geo_ids}")
+        self._append_log(f"⚙️ Режимы: WS={modes['ws']}, QWS={modes['qws']}, BWS={modes['bws']}")
         self._append_log("=" * 70)
         self._append_log("ℹ️ Загрузка сессионных куки обрабатывается turbo_parser_improved.load_cookies_from_profile_to_context")
-        
+
+        # Логируем детали профилей для отладки
+        self._append_log("📋 Детали профилей:")
+        for idx, profile in enumerate(selected_profiles, 1):
+            self._append_log(f"   {idx}. {profile['email']} → {profile['profile_path']}")
+
         # Создаем многопоточный воркер
+        self._append_log("🔧 Создаю MultiParsingWorker...")
         self._worker = MultiParsingWorker(
             phrases=phrases,
             modes=modes,
@@ -918,17 +930,22 @@ class ParsingTab(QWidget):
             selected_profiles=selected_profiles,
             parent=self
         )
+        self._append_log("✓ MultiParsingWorker создан")
         
         # Подключаем сигналы
+        self._append_log("🔌 Подключаю сигналы worker...")
         self._worker.log_signal.connect(self._append_log)
         self._worker.profile_log_signal.connect(self._on_profile_log)
         self._worker.progress_signal.connect(self._on_progress_update)
         self._worker.task_completed.connect(self._on_task_completed)
         self._worker.all_finished.connect(self._on_all_finished)
-        
+        self._append_log("✓ Сигналы подключены")
+
         # Запускаем
         self.save_session_state()
+        self._append_log("▶️ Запускаю worker.start()...")
         self._worker.start()
+        self._append_log("✓ Worker запущен! Ожидайте открытия браузеров...")
         
     def _on_stop_clicked(self):
         """Остановка парсинга"""
