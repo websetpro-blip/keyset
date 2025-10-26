@@ -26,7 +26,6 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QFileDialog,
     QListWidget,
-    QListWidgetItem,
     QAbstractItemView,
 )
 
@@ -327,7 +326,6 @@ class ParsingTab(QWidget):
         self._keys_panel = keys_panel
         self._init_ui()
         self._wire_signals()
-        self._refresh_profiles()
         self._restore_session_state()
 
     def _init_ui(self) -> None:
@@ -392,15 +390,6 @@ class ParsingTab(QWidget):
         # Настройки парсинга (компактно)
         settings_group = QGroupBox("Настройки")
         settings_layout = QVBoxLayout(settings_group)
-
-        # Профили
-        self.profiles_list = QListWidget()
-        self.profiles_list.setMaximumHeight(100)
-        settings_layout.addWidget(QLabel("Профили:"))
-        settings_layout.addWidget(self.profiles_list)
-
-        self.btn_refresh_profiles = QPushButton("Обновить")
-        settings_layout.addWidget(self.btn_refresh_profiles)
 
         # Режимы
         self.chk_ws = QCheckBox("WS")
@@ -552,19 +541,15 @@ class ParsingTab(QWidget):
         self.btn_deselect_all_rows.clicked.connect(self._deselect_all_rows)
         self.btn_invert_selection.clicked.connect(self._invert_selection)
 
-        # Профили
-        self.btn_refresh_profiles.clicked.connect(self._refresh_profiles)
-
         # Правая панель - группы
         self.btn_new_group.clicked.connect(self._on_new_group)
 
         # Журнал
         self.btn_clear_log.clicked.connect(self.log_text.clear)
         
-    def _refresh_profiles(self):
-        """Обновить список профилей"""
-        self.profiles_list.clear()
-        
+    def _get_selected_profiles(self) -> List[dict]:
+        """Получить все профили из БД (вкладка Аккаунты)"""
+        selected = []
         try:
             accounts = list_accounts()
             for account in accounts:
@@ -579,36 +564,14 @@ class ParsingTab(QWidget):
 
                 proxy_value = getattr(account, "proxy", None)
 
-                item = QListWidgetItem(f"📧 {account.name}")
-                item.setCheckState(Qt.Unchecked)
-                item.setData(Qt.UserRole, {
+                selected.append({
                     'email': account.name,
                     'proxy': proxy_value.strip() if isinstance(proxy_value, str) else proxy_value,
                     'profile_path': str(profile_path),
                 })
-                self.profiles_list.addItem(item)
-                    
-            self._append_log(f"✅ Загружено профилей: {self.profiles_list.count()}")
         except Exception as e:
-            self._append_log(f"❌ Ошибка загрузки профилей: {str(e)}")
-            
-    def _select_all_profiles(self):
-        """Выбрать все профили"""
-        for i in range(self.profiles_list.count()):
-            self.profiles_list.item(i).setCheckState(Qt.Checked)
-            
-    def _deselect_all_profiles(self):
-        """Снять выделение со всех профилей"""
-        for i in range(self.profiles_list.count()):
-            self.profiles_list.item(i).setCheckState(Qt.Unchecked)
-            
-    def _get_selected_profiles(self) -> List[dict]:
-        """Получить выбранные профили"""
-        selected = []
-        for i in range(self.profiles_list.count()):
-            item = self.profiles_list.item(i)
-            if item.checkState() == Qt.Checked:
-                selected.append(item.data(Qt.UserRole))
+            print(f"Ошибка загрузки профилей: {str(e)}")
+
         return selected
 
     def save_session_state(self, partial_results: List[Dict[str, Any]] | None = None) -> None:
@@ -629,7 +592,6 @@ class ParsingTab(QWidget):
                 "bws": self.chk_bws.isChecked(),
             },
             "geo_ids": self.geo_tree.selected_geo_ids(),
-            "selected_profiles": self._get_selected_profiles(),
         }
         if partial_results is not None:
             state["partial_results"] = partial_results
@@ -665,14 +627,6 @@ class ParsingTab(QWidget):
         self.chk_ws.setChecked(bool(modes.get("ws", True)))
         self.chk_qws.setChecked(bool(modes.get("qws", False)))
         self.chk_bws.setChecked(bool(modes.get("bws", False)))
-
-        saved_profiles = state.get("selected_profiles") or []
-        saved_emails = {profile.get("email") for profile in saved_profiles if profile.get("email")}
-        for i in range(self.profiles_list.count()):
-            item = self.profiles_list.item(i)
-            data = item.data(Qt.UserRole) or {}
-            if data.get("email") in saved_emails:
-                item.setCheckState(Qt.Checked)
 
         partial_results = state.get("partial_results") or []
         if isinstance(partial_results, list):

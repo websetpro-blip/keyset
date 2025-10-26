@@ -1,0 +1,40 @@
+{
+  "timestamp": "2025-10-26T12:34:01.923637",
+  "phrases": [],
+  "modes": {
+    "ws": true,
+    "qws": false,
+    "bws": false
+  },
+  "geo_ids": [
+    225
+  ],
+  "selected_profiles": [
+    {
+      "email": "dsmismirnov",
+      "profile_path": "C:\\AI\\yandex\\.profiles\\wordstat_main",
+      "proxy": "http://TmNfbT:YFB5cE@77.73.134.166:8000"
+    },
+    {
+      "email": "kuznepetya",
+      "profile_path": "C:\\AI\\yandex\\.profiles\\kuznepetya",
+      "proxy": "TmNfbT:YFB5cE@77.73.134.166:8000"
+    },
+    {
+      "email": "semenovmsemionov",
+      "profile_path": "C:\\AI\\yandex\\.profiles\\semenovmsemionov",
+      "proxy": "nDRYz5:EP0wPC@213.139.221.207:9393"
+    },
+    {
+      "email": "vfefyodorov",
+      "profile_path": "C:\\AI\\yandex\\.profiles\\vfefyodorov",
+      "proxy": "nDRYz5:EP0wPC@213.139.221.207:9393"
+    },
+    {
+      "email": "volkovsvolkow",
+      "profile_path": "C:\\AI\\yandex\\.profiles\\volkovsvolkow",
+      "proxy": "nDRYz5:EP0wPC@213.139.222.51:9738"
+    }
+  ],
+  "partial_results": []
+}

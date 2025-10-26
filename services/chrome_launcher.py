@@ -1,8 +1,9 @@
+# -*- coding: utf-8 -*-
 '''Launch Google Chrome profiles with proxy support.
 
 This module wraps subprocess.Popen to start a regular Chrome instance
 (for manual browsing) with proper proxy and profile handling inside the
-C:/AI/yandex-local workspace.
+C:/AI/yandex workspace.
 '''
 from __future__ import annotations
 
@@ -27,7 +28,7 @@ class ChromeLauncher:
         Path.home() / "AppData/Local/Google/Chrome/Application/chrome.exe",
     )
 
-    BASE_DIR = Path(r"C:/AI/yandex-local")
+    BASE_DIR = Path(r"C:/AI/yandex")
     DEFAULT_START_URL = "about:blank"
     EXTENSIONS_ROOT = BASE_DIR / "runtime" / "proxy_extensions"
 
@@ -85,31 +86,46 @@ console.log('[ProxyAuth] service worker registered');
 
     @classmethod
     def _normalise_profile_path(cls, profile_path: Optional[str], account: str) -> Path:
-        """Return an absolute profile path inside the local workspace.
+        """Вернуть фактический путь профиля Chrome.
 
-        The previous workspace lived under ``C:/AI/yandex`` and many persisted
-        records (database rows, JSON files) still store absolute paths with that
-        prefix. Translate those legacy paths to ``C:/AI/yandex-local`` so we can
-        reuse the existing Chrome profiles without manual editing."""
+        Исторически рабочие профили лежат в ``C:/AI/yandex/.profiles``.
+        Текущая рабочая директория также располагается в ``C:/AI/yandex``.
+        По-прежнему поддерживаем старые абсолютные пути и не создаём новую
+        пустую папку, если уже существует профиль из «легаси»-сборок.
+        """
 
         legacy_root = Path(r"C:/AI/yandex")
         base_root = cls.BASE_DIR
+        candidates: list[Path] = []
+
+        def add_candidate(path: Path) -> None:
+            resolved = path if path.is_absolute() else path
+            if resolved not in candidates:
+                candidates.append(resolved)
 
         if profile_path:
-            path = Path(str(profile_path).strip())
-            if not path.is_absolute():
-                path = base_root / path
-            else:
+            raw = Path(str(profile_path).strip())
+            if raw.is_absolute():
+                add_candidate(raw)
                 try:
-                    relative = path.relative_to(legacy_root)
+                    relative = raw.relative_to(legacy_root)
                 except ValueError:
                     pass
                 else:
-                    path = base_root / relative
+                    add_candidate(base_root / relative)
+            else:
+                add_candidate(base_root / raw)
+                add_candidate(legacy_root / raw)
         else:
-            path = base_root / ".profiles" / account
+            add_candidate(base_root / ".profiles" / account)
+            add_candidate(legacy_root / ".profiles" / account)
 
-        return path.resolve()
+        for candidate in candidates:
+            if candidate and candidate.exists():
+                return candidate.resolve()
+
+        # If nothing exists yet, fallback to first candidate (creates under new workspace)
+        return candidates[0].resolve()
 
     @classmethod
     def _terminate_existing(cls, account: str) -> None:

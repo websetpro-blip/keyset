@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Расширенная вкладка управления аккаунтами с функцией логина
 
@@ -18,6 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from itertools import cycle
+from urllib.parse import urlparse
 
 from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtWidgets import (
@@ -38,10 +40,13 @@ from ..services.cdp_connector_directparser import CDPConnectorDirectParser
 from ..services.captcha import CaptchaService
 from ..workers.visual_browser_manager import VisualBrowserManager, BrowserStatus
 from ..utils.proxy import proxy_to_playwright
+from ..services.proxy_manager import ProxyManager
 # Старый worker больше не используется, теперь CDP подход
 
 PROFILE_SELECT_COLUMN = 5
 PROFILE_OPTIONS_ROLE = Qt.UserRole + 101
+LOGS_ROOT = Path(__file__).resolve().parent.parent / "logs"
+LOGIN_LOG_FILE = LOGS_ROOT / "accounts_login_debug.log"
 
 
 class ProfileComboDelegate(QStyledItemDelegate):
@@ -120,7 +125,7 @@ class AutoLoginThread(QThread):
         import json
         from pathlib import Path
 
-        accounts_file = Path("C:/AI/yandex-local/configs/accounts.json")
+        accounts_file = Path("C:/AI/yandex/configs/accounts.json")
         if not accounts_file.exists():
             self.status_signal.emit(f"[ERROR] Файл accounts.json не найден!")
             self.finished_signal.emit(False, "Файл accounts.json не найден")
@@ -262,7 +267,7 @@ class LoginWorkerThread(QThread):
             if acc.profile_path:
                 profile = str(Path(acc.profile_path).absolute()).replace("\\", "/")
             else:
-                profile = str(Path(f"C:/AI/yandex-local/.profiles/{acc.name}").absolute()).replace("\\", "/")
+                profile = str(Path(f"C:/AI/yandex/.profiles/{acc.name}").absolute()).replace("\\", "/")
             accounts_to_check.append({
                 "name": acc.name,
                 "profile_path": profile,
@@ -353,16 +358,38 @@ class LoginWorkerThread(QThread):
 class AccountsTabExtended(QWidget):
     """Расширенная вкладка аккаунтов с функцией логина"""
     accounts_changed = Signal()
-    
+
+    @staticmethod
+    def _extract_host_port(server: str) -> Optional[str]:
+        """
+        Преобразовать строку вида http://user:pass@host:port в host:port.
+        Возвращает None, если распарсить не удалось.
+        """
+        if not server:
+            return None
+        candidate = server.strip()
+        if not candidate:
+            return None
+        if "://" in candidate:
+            parsed = urlparse(candidate)
+            host = parsed.hostname
+            port = parsed.port
+            if host and port:
+                return f"{host}:{port}"
+            return None
+        if ":" in candidate:
+            return candidate
+        return None
+
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.login_thread = None
         self._current_login_index = 0
         self.captcha_api_key = None
-        self._config_dir = Path("C:/AI/yandex-local/configs")
+        self._config_dir = Path("C:/AI/yandex/configs")
         self._accounts_json_path = self._config_dir / "accounts.json"
         self._captcha_key_path = self._config_dir / "captcha_key.txt"
-        self.default_import_path = Path("C:/AI/yandex-local/новое/Акки, капча, прокси ip 4")
+        self.default_import_path = Path("C:/AI/yandex/новое/Акки, капча, прокси ip 4")
         self.captcha_api_key = self._load_captcha_key()
         self.setup_ui()
         if not self._accounts and self.default_import_path.exists():
@@ -603,6 +630,18 @@ class AccountsTabExtended(QWidget):
         elif hasattr(main_window, 'log_event'):
             main_window.log_event(message, "INFO")
 
+    def _login_debug(self, account: str, message: str) -> None:
+        """Записать техническое сообщение о запуске браузера в лог KeySet."""
+        stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        line = f"[{stamp}] [{account}] {message}\n"
+        try:
+            LOGS_ROOT.mkdir(parents=True, exist_ok=True)
+            with LOGIN_LOG_FILE.open("a", encoding="utf-8") as handle:
+                handle.write(line)
+        except Exception:
+            # Лог только вспомогательный; при ошибках записи не блокируем UI
+            pass
+
     # ------------------------------------------------------------------ helpers: данные/конфигурация
     def _load_captcha_key(self) -> Optional[str]:
         try:
@@ -707,7 +746,7 @@ class AccountsTabExtended(QWidget):
             password = account_data.get("password", "")
             secret = account_data.get("secret")
             proxy_value = next(proxy_cycle)
-            profile_path = Path(f"C:/AI/yandex-local/.profiles/{login}")
+            profile_path = Path(f"C:/AI/yandex/.profiles/{login}")
             profile_path.mkdir(parents=True, exist_ok=True)
 
             db_account = account_service.upsert_account(
@@ -933,7 +972,7 @@ class AccountsTabExtended(QWidget):
         
         # Если используем wordstat_main - проверяем куки там
         if "wordstat_main" in profile_path:
-            profile_path = "C:/AI/yandex-local/.profiles/wordstat_main"
+            profile_path = "C:/AI/yandex/.profiles/wordstat_main"
             
         from pathlib import Path
         cookies_file = Path(profile_path) / "Default" / "Cookies"
@@ -1022,7 +1061,7 @@ class AccountsTabExtended(QWidget):
         # Загружаем данные из accounts.json
         password = ""
         secret_answer = ""
-        accounts_file = Path("C:/AI/yandex-local/configs/accounts.json")
+        accounts_file = Path("C:/AI/yandex/configs/accounts.json")
         if accounts_file.exists():
             with open(accounts_file, 'r', encoding='utf-8') as f:
                 accounts = json.load(f)
@@ -1074,7 +1113,7 @@ class AccountsTabExtended(QWidget):
                 import json
                 from pathlib import Path
                 
-                accounts_file = Path("C:/AI/yandex-local/configs/accounts.json")
+                accounts_file = Path("C:/AI/yandex/configs/accounts.json")
                 if accounts_file.exists():
                     with open(accounts_file, 'r', encoding='utf-8') as f:
                         accounts = json.load(f)
@@ -1262,45 +1301,128 @@ class AccountsTabExtended(QWidget):
             return
 
         used_ports: set[int] = set()
+        proxy_manager = ProxyManager.instance()
+
         for row in selected_rows:
             if row >= len(self._accounts):
                 continue
+
             account = self._accounts[row]
-            proxy_data = proxy_to_playwright(account.proxy)
-            if not proxy_data or not proxy_data.get("server"):
-                self.log_action(f"[{account.name}] Прокси не настроен")
-                continue
+            proxy_server: Optional[str] = None
+            proxy_username: Optional[str] = None
+            proxy_password: Optional[str] = None
+            proxy_display: Optional[str] = None
 
-            proxy_server = proxy_data.get("server", "")
-            if "://" in proxy_server:
-                proxy_server = proxy_server.split("://", 1)[1]
+            if getattr(account, "proxy_id", None):
+                proxy_obj = proxy_manager.get(account.proxy_id)
+                if proxy_obj and proxy_obj.enabled:
+                    proxy_cfg = proxy_obj.playwright_config()
+                    proxy_server = proxy_cfg.get("server")
+                    proxy_username = proxy_cfg.get("username")
+                    proxy_password = proxy_cfg.get("password")
+                    proxy_display = proxy_obj.uri(include_credentials=True)
+                    if proxy_server:
+                        auth_flag = "auth=yes" if proxy_username else "auth=no"
+                        self._login_debug(
+                            account.name,
+                            f"ProxyManager[{proxy_obj.id}] -> {proxy_server} ({auth_flag})",
+                        )
+                    else:
+                        self._login_debug(
+                            account.name,
+                            f"ProxyManager[{proxy_obj.id}] вернул некорректный адрес: {proxy_cfg.get('server')}",
+                        )
+                else:
+                    self._login_debug(
+                        account.name,
+                        f"ProxyManager запись {account.proxy_id} недоступна (отсутствует или отключена)",
+                    )
 
-            port_seed = 9222 + (hash(account.name) % 100)
-            port = self._allocate_cdp_port(port_seed, used_ports)
+            if not proxy_server:
+                raw_proxy = (account.proxy or "").strip()
+                if raw_proxy:
+                    parsed = proxy_to_playwright(raw_proxy)
+                    if parsed and parsed.get("server"):
+                        proxy_server = parsed["server"]
+                        proxy_username = parsed.get("username")
+                        proxy_password = parsed.get("password")
+                        proxy_display = raw_proxy if "://" in raw_proxy else f"http://{raw_proxy}"
+                        auth_flag = "auth=yes" if proxy_username else "auth=no"
+                        self._login_debug(
+                            account.name,
+                            f"Строка аккаунта -> {proxy_server} ({auth_flag})",
+                        )
+                    else:
+                        self._login_debug(
+                            account.name,
+                            f"Не удалось распарсить прокси из строки аккаунта: {raw_proxy}",
+                        )
+                else:
+                    self._login_debug(account.name, "Прокси для аккаунта не задан")
 
-            try:
-                ChromeLauncherDirectParser.launch(
-                    account_name=account.name,
-                    profile_path=account.profile_path,
-                    cdp_port=port,
-                    proxy_server=proxy_server,
-                    proxy_username=proxy_data.get("username"),
-                    proxy_password=proxy_data.get("password"),
-                    start_url="about:blank",
+            if proxy_server:
+                self.log_action(f"[{account.name}] [INFO] Используется прокси: {proxy_display or proxy_server}")
+                auth_flag = "с авторизацией" if proxy_username else "без авторизации"
+                self._login_debug(
+                    account.name,
+                    f"DirectParser запуск: server={proxy_server}, {auth_flag}, профиль={account.profile_path}",
                 )
+                try:
+                    ChromeLauncherDirectParser.launch(
+                        account_name=account.name,
+                        profile_path=account.profile_path,
+                        proxy_server=proxy_server,
+                        proxy_username=proxy_username,
+                        proxy_password=proxy_password,
+                        start_url="about:blank",
+                    )
+                    self.log_action(f"✅ [{account.name}] Chrome запущен")
+                    self._set_table_status(row, "Браузер запущен")
+                    self._login_debug(
+                        account.name,
+                        "DirectParser запуск выполнен",
+                    )
+                except FileNotFoundError:
+                    message = (
+                        "Не найден Chrome по пути C:/Program Files/Google/Chrome/Application/chrome.exe. "
+                        "Установите Chrome или обновите путь в chrome_launcher_directparser.py."
+                    )
+                    self.log_action(f"[{account.name}] ❌ {message}")
+                    QMessageBox.critical(self, "Chrome", message)
+                    self._login_debug(account.name, f"DirectParser ошибка: {message}")
+                except Exception as exc:
+                    error = f"[{account.name}] Ошибка запуска Chrome: {exc}"
+                    self.log_action(error)
+                    QMessageBox.critical(self, "Ошибка запуска Chrome", error)
+                    self._login_debug(account.name, f"DirectParser исключение: {exc}")
+            else:
+                self.log_action(f"[{account.name}] [WARNING] Прокси не указан — запускаю без прокси")
+                self._login_debug(
+                    account.name,
+                    "Прокси отсутствует -> стандартный запуск Chrome",
+                )
+                port_seed = 9222 + (hash(account.name) % 100)
+                port = self._allocate_cdp_port(port_seed, used_ports)
                 used_ports.add(port)
-                self.log_action(f"✅ [{account.name}] Chrome запущен (порт {port})")
-                self._set_table_status(row, f"Браузер запущен (порт {port})")
-            except FileNotFoundError:
-                message = (
-                    "Не найден Chrome по пути C:/Program Files/Google/Chrome/Application/chrome.exe. "
-                    "Установите Chrome или обновите путь в chrome_launcher_directparser.py."
-                )
-                self.log_action(f"[ERROR] {message}")
-                QMessageBox.critical(self, "Chrome", message)
-            except Exception as exc:
-                self.log_action(f"[ERROR] Запуск Chrome для {account.name} завершился ошибкой: {exc}")
-                QMessageBox.critical(self, "Ошибка", str(exc))
+                try:
+                    ChromeLauncher.launch(
+                        account=account.name,
+                        profile_path=account.profile_path,
+                        cdp_port=port,
+                        proxy_server=None,
+                        start_url="about:blank",
+                    )
+                    self.log_action(f"✅ [{account.name}] Chrome запущен без прокси")
+                    self._set_table_status(row, "Браузер запущен")
+                    self._login_debug(
+                        account.name,
+                        "Стандартный запуск Chrome выполнен",
+                    )
+                except Exception as exc:
+                    error = f"[{account.name}] Ошибка запуска Chrome без прокси: {exc}"
+                    self.log_action(error)
+                    QMessageBox.critical(self, "Ошибка запуска Chrome", error)
+                    self._login_debug(account.name, f"Стандартный запуск: исключение {exc}")
 
     def auto_login_selected(self):
         """Автоматическая авторизация ВЫБРАННЫХ аккаунтов (где стоят галочки)"""
@@ -1435,7 +1557,7 @@ class AccountsTabExtended(QWidget):
         time.sleep(2)
         
         chrome_exe = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-        base_path = Path("C:/AI/yandex-local/.profiles")
+        base_path = Path("C:/AI/yandex/.profiles")
         
         # Запускаем ТОЛЬКО ВЫБРАННЫЕ браузеры
         launched = 0
@@ -1624,12 +1746,12 @@ class AccountsTabExtended(QWidget):
                 if acc.profile_path:
                     # Если путь начинается с .profiles - это относительный путь
                     if acc.profile_path.startswith(".profiles"):
-                        profile_full_path = Path("C:/AI/yandex-local") / acc.profile_path
+                        profile_full_path = Path("C:/AI/yandex") / acc.profile_path
                     else:
                         profile_full_path = Path(acc.profile_path)
                 else:
                     # Если путь не задан, используем стандартный
-                    profile_full_path = Path("C:/AI/yandex-local/.profiles") / acc.name
+                    profile_full_path = Path("C:/AI/yandex/.profiles") / acc.name
                 
                 # Проверяем есть ли сохраненные куки
                 cookie_file = profile_full_path / "Default" / "Cookies"
@@ -1721,7 +1843,7 @@ class AccountsTabExtended(QWidget):
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QDialogButtonBox, QLabel
         
         # Путь к профилю wordstat_main
-        profile_path = Path("C:/AI/yandex-local/.profiles/wordstat_main")
+        profile_path = Path("C:/AI/yandex/.profiles/wordstat_main")
         
         # Создаем диалог
         dialog = QDialog(self)
@@ -1773,7 +1895,7 @@ class AccountsTabExtended(QWidget):
     def _update_profile(self, account_id, profile_key):
         """Обновить профиль для аккаунта"""
         profile_name = profile_key or "wordstat_main"
-        profile_path = f"C:/AI/yandex-local/.profiles/{profile_name}"
+        profile_path = f"C:/AI/yandex/.profiles/{profile_name}"
         account_service.update_account(account_id, profile_path=profile_path)
         print(f"[Accounts] Профиль для аккаунта {account_id} изменен на {profile_name}")
 
@@ -1792,7 +1914,7 @@ class AccountsTabExtended(QWidget):
         item.setData(Qt.DisplayRole, label)
         item.setText(label)
         self.table.blockSignals(False)
-        account.profile_path = f"C:/AI/yandex-local/.profiles/{profile_value}"
+        account.profile_path = f"C:/AI/yandex/.profiles/{profile_value}"
         self._update_profile(account.id, profile_value)
         
     def on_table_double_click(self, row, col):
@@ -1809,7 +1931,7 @@ class AccountsTabExtended(QWidget):
         
         # Если путь относительный - делаем полный
         if not profile_path.startswith("C:"):
-            profile_path = f"C:/AI/yandex-local/{profile_path}"
+            profile_path = f"C:/AI/yandex/{profile_path}"
             
         from pathlib import Path
         cookies_file = Path(profile_path) / "Default" / "Cookies"
@@ -1867,7 +1989,7 @@ class AccountsTabExtended(QWidget):
         
         # Если путь относительный - делаем полный
         if not profile_path.startswith("C:"):
-            profile_path = f"C:/AI/yandex-local/{profile_path}"
+            profile_path = f"C:/AI/yandex/{profile_path}"
             
         # Запускаем Chrome
         chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"

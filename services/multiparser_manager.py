@@ -6,8 +6,12 @@
 """
 
 import asyncio
+import base64
 import json
 import logging
+import shutil
+import sqlite3
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -19,6 +23,13 @@ from queue import Queue
 
 from playwright.async_api import BrowserContext
 from sqlalchemy import select
+import win32crypt
+
+try:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    AESGCM_AVAILABLE = True
+except ImportError:  # pragma: no cover - safety fallback
+    AESGCM_AVAILABLE = False
 
 try:
     from ..core.db import SessionLocal
@@ -45,6 +56,160 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger('MultiParser')
+
+_MASTER_KEY_CACHE: Dict[Path, Optional[bytes]] = {}
+
+
+def _get_chrome_master_key(profile_path: Path, logger_obj: logging.Logger) -> Optional[bytes]:
+    """Извлечь мастер-ключ Chrome для расшифровки v10 cookie."""
+    resolved_path = profile_path.resolve()
+    if resolved_path in _MASTER_KEY_CACHE:
+        return _MASTER_KEY_CACHE[resolved_path]
+
+    local_state_path = resolved_path / "Local State"
+    if not local_state_path.exists():
+        logger_obj.debug(f"[{profile_path.name}] Local State не найден по пути {local_state_path}")
+        _MASTER_KEY_CACHE[resolved_path] = None
+        return None
+
+    try:
+        data = json.loads(local_state_path.read_text(encoding="utf-8"))
+        encrypted_key_b64 = data.get("os_crypt", {}).get("encrypted_key")
+        if not encrypted_key_b64:
+            logger_obj.debug(f"[{profile_path.name}] В Local State отсутствует os_crypt.encrypted_key")
+            _MASTER_KEY_CACHE[resolved_path] = None
+            return None
+        encrypted_key = base64.b64decode(encrypted_key_b64)
+        if encrypted_key.startswith(b"DPAPI"):
+            encrypted_key = encrypted_key[5:]
+        master_key = win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]
+        _MASTER_KEY_CACHE[resolved_path] = master_key
+        return master_key
+    except Exception as exc:  # pragma: no cover - диагностический путь
+        logger_obj.warning(f"[{profile_path.name}] Не удалось получить мастер-ключ Chrome: {exc}")
+        _MASTER_KEY_CACHE[resolved_path] = None
+        return None
+
+
+def _decrypt_chrome_value(
+    encrypted_value: bytes,
+    profile_path: Path,
+    logger_obj: logging.Logger,
+    master_key: Optional[bytes],
+) -> str:
+    """Расшифровать значение cookie из Chrome (Windows DPAPI)."""
+    if not encrypted_value:
+        return ""
+    try:
+        if encrypted_value.startswith(b'v10') or encrypted_value.startswith(b'v11'):
+            if not AESGCM_AVAILABLE:
+                logger_obj.debug(f"[{profile_path.name}] AESGCM недоступен, не удалось расшифровать cookie v10")
+                return ""
+            if not master_key:
+                master_key = _get_chrome_master_key(profile_path, logger_obj)
+                if not master_key:
+                    return ""
+            nonce = encrypted_value[3:15]
+            ciphertext = encrypted_value[15:-16]
+            tag = encrypted_value[-16:]
+            aesgcm = AESGCM(master_key)
+            decrypted = aesgcm.decrypt(nonce, ciphertext + tag, None)
+        else:
+            decrypted = win32crypt.CryptUnprotectData(encrypted_value, None, None, None, 0)[1]
+        return decrypted.decode("utf-8", errors="ignore")
+    except Exception:
+        return ""
+
+
+def _extract_profile_cookies(profile_path: Path, logger_obj: logging.Logger) -> List[Dict[str, Any]]:
+    """Вытащить куки из Chrome-профиля на диске и привести в формат Playwright."""
+    candidates = [
+        profile_path / "Default" / "Network" / "Cookies",
+        profile_path / "Default" / "Cookies",
+        profile_path / "Cookies",
+        profile_path / "Network" / "Cookies",
+    ]
+    source_path: Optional[Path] = None
+    for candidate in candidates:
+        if candidate.exists():
+            source_path = candidate
+            break
+
+    if not source_path:
+        # fallback: ищем любой файл Cookies в структуре профиля
+        try:
+            for candidate in profile_path.rglob("Cookies"):
+                if candidate.is_file():
+                    source_path = candidate
+                    break
+        except Exception as exc:  # pragma: no cover - защитный путь
+            logger_obj.debug(f"[{profile_path.name}] Ошибка при поиске Cookies: {exc}")
+
+    if not source_path:
+        logger_obj.info(f"[{profile_path.name}] Файл Cookies не найден в профиле")
+        return []
+
+    tmp_dir = Path(tempfile.gettempdir())
+    tmp_copy = tmp_dir / f"cookies_{profile_path.name}_{int(time.time())}.db"
+    try:
+        shutil.copy2(source_path, tmp_copy)
+    except Exception as exc:
+        logger_obj.error(f"[{profile_path.name}] Не удалось скопировать Cookies: {exc}")
+        return []
+
+    cookies: List[Dict[str, Any]] = []
+    try:
+        conn = sqlite3.connect(tmp_copy)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT host_key, name, value, encrypted_value, path, expires_utc,
+                   is_secure, is_httponly, samesite
+            FROM cookies
+            """
+        )
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception as exc:
+        logger_obj.error(f"[{profile_path.name}] Ошибка чтения Cookies: {exc}")
+        tmp_copy.unlink(missing_ok=True)
+        return []
+
+    master_key = _get_chrome_master_key(profile_path, logger_obj)
+
+    for host_key, name, value, encrypted_value, path_value, expires_utc, is_secure, is_httponly, same_site in rows:
+        if not name:
+            continue
+        if not value and encrypted_value:
+            if master_key is None and (encrypted_value.startswith(b'v10') or encrypted_value.startswith(b'v11')):
+                master_key = _get_chrome_master_key(profile_path, logger_obj)
+            value = _decrypt_chrome_value(encrypted_value, profile_path, logger_obj, master_key)
+        if not value:
+            continue
+        host = host_key or ""
+        if "yandex" not in host and ".ya" not in host:
+            continue
+
+        cookie_entry: Dict[str, Any] = {
+            "name": name,
+            "value": value,
+            "domain": host_key if host_key.startswith(".") else f".{host_key}",
+            "path": path_value or "/",
+            "secure": bool(is_secure),
+            "httpOnly": bool(is_httponly),
+        }
+        if expires_utc and expires_utc != 0:
+            # Преобразуем Windows epoch (микросекунды с 1601 г.)
+            expires = int(expires_utc / 1_000_000 - 11644473600)
+            if expires > 0:
+                cookie_entry["expires"] = expires
+        same_site_map = {0: "None", 1: "Lax", 2: "Strict"}
+        if same_site in same_site_map:
+            cookie_entry["sameSite"] = same_site_map[same_site]
+        cookies.append(cookie_entry)
+
+    tmp_copy.unlink(missing_ok=True)
+    return cookies
 
 async def load_cookies_from_db_to_context(
     context: BrowserContext,
@@ -106,6 +271,49 @@ async def save_cookies_to_db(
     except Exception as exc:
         log.error(f"[{account_name}] Ошибка сохранения куки в БД: {exc}")
 
+
+async def load_cookies_from_profile_to_context(
+    context: BrowserContext,
+    account_name: str,
+    profile_path: Path,
+    logger_obj: Optional[logging.Logger] = None,
+    persist: bool = True,
+) -> bool:
+    """
+    Загрузить куки из локального Chrome-профиля и добавить их в контекст браузера.
+
+    Args:
+        context: активный контекст Playwright
+        account_name: имя аккаунта в KeySet
+        profile_path: путь к профилю Chrome на диске
+        logger_obj: кастомный логгер (опционально)
+        persist: дополнительно сохранить загруженные куки в БД
+
+    Returns:
+        True если куки успешно добавлены, иначе False
+    """
+    log = logger_obj or logger
+    path_obj = Path(profile_path)
+
+    cookies = _extract_profile_cookies(path_obj, log)
+    if not cookies:
+        log.info(f"[{account_name}] Куки в профиле {path_obj} не найдены")
+        return False
+
+    try:
+        await context.add_cookies(cookies)
+        log.info(f"[{account_name}] ✓ Загружено {len(cookies)} куки из профиля {path_obj.name}")
+    except Exception as exc:
+        log.error(f"[{account_name}] Ошибка добавления куки из профиля: {exc}")
+        return False
+
+    if persist:
+        try:
+            await save_cookies_to_db(account_name, context, log)
+        except Exception as exc:
+            log.warning(f"[{account_name}] Не удалось сохранить куки из профиля в БД: {exc}")
+
+    return True
 
 @dataclass
 class ParsingTask:
@@ -565,4 +773,5 @@ __all__ = [
     "MultiParserManager",
     "load_cookies_from_db_to_context",
     "save_cookies_to_db",
+    "load_cookies_from_profile_to_context",
 ]

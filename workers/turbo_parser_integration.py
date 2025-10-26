@@ -306,7 +306,11 @@ class TurboWordstatParser:
             await page.evaluate(WORDSTAT_FETCH_NORMALIZER_SCRIPT)
         except Exception:
             pass
-        await page.goto("https://wordstat.yandex.ru/#!/?region=225", wait_until="domcontentloaded")
+        await page.goto(
+            "https://wordstat.yandex.ru/#!/?region=225",
+            wait_until="domcontentloaded",
+            timeout=30000,
+        )
         self.pages = [page]
 
     async def setup_tabs(self) -> None:
@@ -329,7 +333,11 @@ class TurboWordstatParser:
             self.page_mapping[i] = page
             if "wordstat.yandex.ru" not in page.url:
                 try:
-                    await page.goto("https://wordstat.yandex.ru/#!/?region=225", wait_until="domcontentloaded", timeout=15000)
+                    await page.goto(
+                        "https://wordstat.yandex.ru/#!/?region=225",
+                        wait_until="domcontentloaded",
+                        timeout=30000,
+                    )
                     await asyncio.sleep(2)
                 except Exception as exc:
                     print(f"[TURBO] Tab {i}: ошибка загрузки Wordstat: {exc}")

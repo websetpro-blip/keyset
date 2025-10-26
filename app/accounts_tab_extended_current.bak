@@ -1,4 +1,4 @@
-"""
+﻿"""
 Расширенная вкладка управления аккаунтами с функцией логина
 
 ПРАВИЛО №1: НЕ ЛОМАТЬ ТО ЧТО РАБОТАЕТ!
@@ -129,10 +129,10 @@ class AutoLoginThread(QThread):
         self.status_signal.emit(f"[OK] Профиль РёР· Р'Р]: {profile_path}")
 
         if not profile_path.startswith("C:"):
-            profile_path = f"C:/AI/yandex-local/{profile_path}"
+            profile_path = f"C:/AI/yandex/{profile_path}"
             self.status_signal.emit(f"[INFO] Путь преобразован: {profile_path}")
 
-        accounts_file = Path("C:/AI/yandex-local/configs/accounts.json")
+        accounts_file = Path("C:/AI/yandex/configs/accounts.json")
         if not accounts_file.exists():
             self.status_signal.emit(f"[ERROR] Файл accounts.json не найден!")
             self.finished_signal.emit(False, "Файл accounts.json не найден")
@@ -237,7 +237,7 @@ class LoginWorkerThread(QThread):
             if acc.profile_path:
                 profile = str(Path(acc.profile_path).absolute()).replace("\\", "/")
             else:
-                profile = str(Path(f"C:/AI/yandex-local/.profiles/{acc.name}").absolute()).replace("\\", "/")
+                profile = str(Path(f"C:/AI/yandex/.profiles/{acc.name}").absolute()).replace("\\", "/")
             accounts_to_check.append({
                 "name": acc.name,
                 "profile_path": profile,
@@ -334,10 +334,10 @@ class AccountsTabExtended(QWidget):
         self.login_thread = None
         self._current_login_index = 0
         self.captcha_api_key = None
-        self._config_dir = Path("C:/AI/yandex-local/configs")
+        self._config_dir = Path("C:/AI/yandex/configs")
         self._accounts_json_path = self._config_dir / "accounts.json"
         self._captcha_key_path = self._config_dir / "captcha_key.txt"
-        self.default_import_path = Path("C:/AI/yandex-local/новое/Акки, капча, прокси ip 4")
+        self.default_import_path = Path("C:/AI/yandex/новое/Акки, капча, прокси ip 4")
         self.captcha_api_key = self._load_captcha_key()
         self.setup_ui()
         if not self._accounts and self.default_import_path.exists():
@@ -682,7 +682,7 @@ class AccountsTabExtended(QWidget):
             password = account_data.get("password", "")
             secret = account_data.get("secret")
             proxy_value = next(proxy_cycle)
-            profile_path = Path(f"C:/AI/yandex-local/.profiles/{login}")
+            profile_path = Path(f"C:/AI/yandex/.profiles/{login}")
             profile_path.mkdir(parents=True, exist_ok=True)
 
             db_account = account_service.upsert_account(
@@ -908,7 +908,7 @@ class AccountsTabExtended(QWidget):
         
         # Если используем wordstat_main - проверяем куки там
         if "wordstat_main" in profile_path:
-            profile_path = "C:/AI/yandex-local/.profiles/wordstat_main"
+            profile_path = "C:/AI/yandex/.profiles/wordstat_main"
             
         from pathlib import Path
         cookies_file = Path(profile_path) / "Default" / "Cookies"
@@ -997,7 +997,7 @@ class AccountsTabExtended(QWidget):
         # Загружаем данные из accounts.json
         password = ""
         secret_answer = ""
-        accounts_file = Path("C:/AI/yandex-local/configs/accounts.json")
+        accounts_file = Path("C:/AI/yandex/configs/accounts.json")
         if accounts_file.exists():
             with open(accounts_file, 'r', encoding='utf-8') as f:
                 accounts = json.load(f)
@@ -1049,7 +1049,7 @@ class AccountsTabExtended(QWidget):
                 import json
                 from pathlib import Path
                 
-                accounts_file = Path("C:/AI/yandex-local/configs/accounts.json")
+                accounts_file = Path("C:/AI/yandex/configs/accounts.json")
                 if accounts_file.exists():
                     with open(accounts_file, 'r', encoding='utf-8') as f:
                         accounts = json.load(f)
@@ -1405,7 +1405,7 @@ class AccountsTabExtended(QWidget):
         time.sleep(2)
         
         chrome_exe = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-        base_path = Path("C:/AI/yandex-local/.profiles")
+        base_path = Path("C:/AI/yandex/.profiles")
         
         # Запускаем ТОЛЬКО ВЫБРАННЫЕ браузеры
         launched = 0
@@ -1594,12 +1594,12 @@ class AccountsTabExtended(QWidget):
                 if acc.profile_path:
                     # Если путь начинается с .profiles - это относительный путь
                     if acc.profile_path.startswith(".profiles"):
-                        profile_full_path = Path("C:/AI/yandex-local") / acc.profile_path
+                        profile_full_path = Path("C:/AI/yandex") / acc.profile_path
                     else:
                         profile_full_path = Path(acc.profile_path)
                 else:
                     # Если путь не задан, используем стандартный
-                    profile_full_path = Path("C:/AI/yandex-local/.profiles") / acc.name
+                    profile_full_path = Path("C:/AI/yandex/.profiles") / acc.name
                 
                 # Проверяем есть ли сохраненные куки
                 cookie_file = profile_full_path / "Default" / "Cookies"
@@ -1691,7 +1691,7 @@ class AccountsTabExtended(QWidget):
         from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QDialogButtonBox, QLabel
         
         # Путь к профилю wordstat_main
-        profile_path = Path("C:/AI/yandex-local/.profiles/wordstat_main")
+        profile_path = Path("C:/AI/yandex/.profiles/wordstat_main")
         
         # Создаем диалог
         dialog = QDialog(self)
@@ -1743,7 +1743,7 @@ class AccountsTabExtended(QWidget):
     def _update_profile(self, account_id, profile_key):
         """Обновить профиль для аккаунта"""
         profile_name = profile_key or "wordstat_main"
-        profile_path = f"C:/AI/yandex-local/.profiles/{profile_name}"
+        profile_path = f"C:/AI/yandex/.profiles/{profile_name}"
         account_service.update_account(account_id, profile_path=profile_path)
         print(f"[Accounts] Профиль для аккаунта {account_id} изменен на {profile_name}")
 
@@ -1762,7 +1762,7 @@ class AccountsTabExtended(QWidget):
         item.setData(Qt.DisplayRole, label)
         item.setText(label)
         self.table.blockSignals(False)
-        account.profile_path = f"C:/AI/yandex-local/.profiles/{profile_value}"
+        account.profile_path = f"C:/AI/yandex/.profiles/{profile_value}"
         self._update_profile(account.id, profile_value)
         
     def on_table_double_click(self, row, col):
@@ -1779,7 +1779,7 @@ class AccountsTabExtended(QWidget):
         
         # Если путь относительный - делаем полный
         if not profile_path.startswith("C:"):
-            profile_path = f"C:/AI/yandex-local/{profile_path}"
+            profile_path = f"C:/AI/yandex/{profile_path}"
             
         from pathlib import Path
         cookies_file = Path(profile_path) / "Default" / "Cookies"
@@ -1837,7 +1837,7 @@ class AccountsTabExtended(QWidget):
         
         # Если путь относительный - делаем полный
         if not profile_path.startswith("C:"):
-            profile_path = f"C:/AI/yandex-local/{profile_path}"
+            profile_path = f"C:/AI/yandex/{profile_path}"
             
         # Запускаем Chrome
         chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
@@ -1859,4 +1859,5 @@ class AccountsTabExtended(QWidget):
         """Получить статус куков для аккаунта (используем функцию из файла 42)"""
         # Используем функцию get_cookies_status() из services/accounts.py
         return get_cookies_status(account)
+
 

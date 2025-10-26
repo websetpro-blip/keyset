@@ -321,5 +321,5 @@ def main() -> None:
 
 
 __all__ = ["AccountDialog", "MainWindow", "main"]
-WORKSPACE_ROOT = Path(r"C:/AI/yandex-local")
+WORKSPACE_ROOT = Path(r"C:/AI/yandex")
 ACCOUNTS_CONFIG_PATH = WORKSPACE_ROOT / "configs" / "accounts.json"
