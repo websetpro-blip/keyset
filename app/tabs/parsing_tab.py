@@ -25,7 +25,6 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QProgressBar,
     QFileDialog,
-    QListWidget,
     QAbstractItemView,
 )
 
@@ -464,34 +463,12 @@ class ParsingTab(QWidget):
         center_layout.addWidget(phrases_label)
         center_layout.addWidget(self.phrases_edit)
 
-        # ───────────────────────────────────────────────────────────
-        # ПРАВАЯ КОЛОНКА (10%) - Группы фраз
-        # ───────────────────────────────────────────────────────────
-        right_panel = QWidget()
-        right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-
-        right_layout.addWidget(QLabel("Группы фраз"))
-
-        self.groups_list = QListWidget()
-        self.groups_list.addItem("✓ Все фразы")
-        self.groups_list.addItem("✓ Группа 1")
-        self.groups_list.addItem("✗ Группа 2")
-
-        right_layout.addWidget(self.groups_list)
-
-        self.btn_new_group = QPushButton("➕ Новая")
-        right_layout.addWidget(self.btn_new_group)
-
-        right_layout.addStretch()
-
-        # Добавляем колонки в splitter
+        # Добавляем колонки в splitter (2 колонки: левая + центральная)
         splitter_main.addWidget(left_panel)
         splitter_main.addWidget(center_panel)
-        splitter_main.addWidget(right_panel)
 
-        # Пропорции: Левая ~80px, Центр ~800px, Правая ~120px
-        splitter_main.setSizes([100, 800, 120])
+        # Пропорции: Левая ~100px, Центр ~900px
+        splitter_main.setSizes([100, 900])
 
         main_layout.addWidget(splitter_main)
 
@@ -540,9 +517,6 @@ class ParsingTab(QWidget):
         self.btn_select_all_rows.clicked.connect(self._select_all_rows)
         self.btn_deselect_all_rows.clicked.connect(self._deselect_all_rows)
         self.btn_invert_selection.clicked.connect(self._invert_selection)
-
-        # Правая панель - группы
-        self.btn_new_group.clicked.connect(self._on_new_group)
 
         # Журнал
         self.btn_clear_log.clicked.connect(self.log_text.clear)
@@ -805,10 +779,6 @@ class ParsingTab(QWidget):
     def _on_forecast(self):
         """Прогноз бюджета - заглушка"""
         self._append_log("💰 Прогноз бюджета (в разработке)")
-
-    def _on_new_group(self):
-        """Создать новую группу - заглушка"""
-        self._append_log("➕ Создание новой группы (в разработке)")
 
     # ═══════════════════════════════════════════════════════════
     # Парсинг
