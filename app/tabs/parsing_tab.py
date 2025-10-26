@@ -8,7 +8,7 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QListWidget,
     QListWidgetItem,
+    QAbstractItemView,
 )
 
 from ..widgets.geo_tree import GeoTree
@@ -37,6 +38,11 @@ try:
 except ImportError:
     from services.accounts import list_accounts
 
+try:
+    from ...services import multiparser_manager
+except ImportError:  # pragma: no cover - fallback for scripts
+    import multiparser_manager  # type: ignore
+
 # Импорт turbo_parser_10tabs
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -45,6 +51,40 @@ if str(PACKAGE_ROOT) not in sys.path:
 
 BASE_DIR = PROJECT_ROOT
 SESSION_FILE = BASE_DIR / "keyset/logs/parsing_session.json"
+
+
+def _probe_profile_cookies(profile_record: Dict[str, Any]) -> Tuple[int, Optional[str]]:
+    """
+    Quickly read cookies from the Chrome profile on disk to report how many are available.
+
+    Returns:
+        (cookie_count, error_message)
+    """
+    path_value = profile_record.get("profile_path")
+    if not path_value:
+        return -1, "Путь профиля не указан"
+
+    try:
+        path_obj = Path(path_value)
+    except TypeError:
+        return -1, f"Неверный тип пути профиля: {path_value!r}"
+
+    log_obj = getattr(multiparser_manager, "logger", None)
+    if log_obj is None:
+        return -1, "Логгер multiparser_manager не доступен"
+
+    try:
+        cookies = multiparser_manager._extract_profile_cookies(  # type: ignore[attr-defined]
+            path_obj,
+            log_obj,
+        )
+    except Exception as exc:  # pragma: no cover - диагностический путь
+        return -1, str(exc)
+
+    if cookies is None:
+        return -1, "Не удалось извлечь куки"
+
+    return len(cookies), None
 
 try:
     from turbo_parser_improved import turbo_parser_10tabs  # type: ignore
@@ -62,12 +102,21 @@ except ImportError as improved_error:  # pragma: no cover - optional dependency
 class SingleParsingTask:
     """Одна задача парсинга для конкретного профиля"""
     
-    def __init__(self, profile_email: str, profile_path: str, proxy: str, phrases: List[str], session_id: str):
+    def __init__(
+        self,
+        profile_email: str,
+        profile_path: str,
+        proxy: str,
+        phrases: List[str],
+        session_id: str,
+        cookie_count: Optional[int] = None,
+    ):
         self.profile_email = profile_email
         self.profile_path = Path(profile_path)
         self.proxy = proxy
         self.phrases = phrases
         self.session_id = session_id
+        self.cookie_count = cookie_count
         self.results = {}
         self.status = "waiting"
         self.progress = 0
@@ -93,6 +142,8 @@ class SingleParsingTask:
                 
             self.log(f"✓ Профиль: {self.profile_path}", "INFO")
             self.log(f"✓ Прокси: {self.proxy or 'НЕТ'}", "INFO")
+            if self.cookie_count is not None:
+                self.log(f"✓ Куки (предварительно): {self.cookie_count} шт", "INFO")
             
             # Запуск парсера
             self.results = await turbo_parser_10tabs(
@@ -138,16 +189,32 @@ class MultiParsingWorker(QThread):
         self.selected_profiles = selected_profiles
         self._stop_requested = False
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Создаем задачи для каждого профиля
+
+        # Распределяем фразы поровну между профилями
+        num_profiles = len(selected_profiles)
+        phrases_per_profile = len(phrases) // num_profiles
+        remainder = len(phrases) % num_profiles
+
+        batches = []
+        start_idx = 0
+
+        for i in range(num_profiles):
+            # Добавляем по одной фразе к последним профилям если есть остаток
+            end_idx = start_idx + phrases_per_profile + (1 if i >= num_profiles - remainder else 0)
+            batch = phrases[start_idx:end_idx]
+            batches.append(batch)
+            start_idx = end_idx
+
+        # Создаем задачи для каждого профиля с распределёнными фразами
         self.tasks = []
-        for profile in selected_profiles:
+        for profile, batch in zip(selected_profiles, batches):
             task = SingleParsingTask(
                 profile_email=profile['email'],
                 profile_path=profile['profile_path'],
                 proxy=profile.get('proxy'),
-                phrases=self.phrases,
-                session_id=self.session_id
+                phrases=batch,  # ✅ Каждый профиль получает ТОЛЬКО свой батч фраз
+                session_id=self.session_id,
+                cookie_count=profile.get("cookie_count"),
             )
             self.tasks.append(task)
             
@@ -264,146 +331,234 @@ class ParsingTab(QWidget):
         self._restore_session_state()
 
     def _init_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        
-        # Верхняя панель с настройками
-        top_panel = QHBoxLayout()
-        
-        # Группа: Профили
-        grp_profiles = QGroupBox("Профили для парсинга")
-        profiles_layout = QVBoxLayout()
-        
-        # Список профилей с чекбоксами
+        """Инициализация UI по архитектуре Key Collector"""
+        main_layout = QVBoxLayout(self)
+
+        # ═══════════════════════════════════════════════════════════
+        # 1️⃣ TOP PANEL - функции вверху
+        # ═══════════════════════════════════════════════════════════
+        top_panel = QWidget()
+        top_layout = QHBoxLayout(top_panel)
+
+        # Кнопки основных функций
+        self.btn_add = QPushButton("➕ Добавить")
+        self.btn_delete = QPushButton("❌ Удалить")
+        self.btn_ws = QPushButton("📊 Частотка")
+        self.btn_batch = QPushButton("📦 Пакет")
+        self.btn_forecast = QPushButton("💰 Прогноз")
+        self.btn_clear = QPushButton("🗑️ Очистить")
+        self.btn_export = QPushButton("💾 Экспорт")
+
+        top_layout.addWidget(self.btn_add)
+        top_layout.addWidget(self.btn_delete)
+        top_layout.addWidget(QLabel("  |  "))
+        top_layout.addWidget(self.btn_ws)
+        top_layout.addWidget(self.btn_batch)
+        top_layout.addWidget(self.btn_forecast)
+        top_layout.addWidget(QLabel("  |  "))
+        top_layout.addWidget(self.btn_clear)
+        top_layout.addWidget(self.btn_export)
+        top_layout.addStretch()
+
+        # Статус
+        self.status_label = QLabel("🟢 Готово")
+        self.status_label.setStyleSheet("QLabel { font-weight: bold; padding: 5px; }")
+        top_layout.addWidget(self.status_label)
+
+        main_layout.addWidget(top_panel)
+
+        # ═══════════════════════════════════════════════════════════
+        # 2️⃣ ГЛАВНАЯ ОБЛАСТЬ - 3 колонки
+        # ═══════════════════════════════════════════════════════════
+        splitter_main = QSplitter(Qt.Horizontal)
+
+        # ───────────────────────────────────────────────────────────
+        # ЛЕВАЯ КОЛОНКА (5-10%) - Управление выбором строк
+        # ───────────────────────────────────────────────────────────
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Кнопки управления выбором
+        self.btn_select_all_rows = QPushButton("✓ Выбрать все")
+        self.btn_deselect_all_rows = QPushButton("✗ Снять выбор")
+        self.btn_invert_selection = QPushButton("🔄 Инвертировать")
+
+        left_layout.addWidget(self.btn_select_all_rows)
+        left_layout.addWidget(self.btn_deselect_all_rows)
+        left_layout.addWidget(self.btn_invert_selection)
+        left_layout.addSpacing(10)
+
+        # Настройки парсинга (компактно)
+        settings_group = QGroupBox("Настройки")
+        settings_layout = QVBoxLayout(settings_group)
+
+        # Профили
         self.profiles_list = QListWidget()
-        self.profiles_list.setMaximumHeight(150)
-        profiles_layout.addWidget(QLabel("Выберите профили:"))
-        profiles_layout.addWidget(self.profiles_list)
-        
-        # Кнопки управления
-        profiles_buttons = QHBoxLayout()
-        self.btn_select_all = QPushButton("Выбрать все")
-        self.btn_deselect_all = QPushButton("Снять все")
+        self.profiles_list.setMaximumHeight(100)
+        settings_layout.addWidget(QLabel("Профили:"))
+        settings_layout.addWidget(self.profiles_list)
+
         self.btn_refresh_profiles = QPushButton("Обновить")
-        profiles_buttons.addWidget(self.btn_select_all)
-        profiles_buttons.addWidget(self.btn_deselect_all)
-        profiles_buttons.addWidget(self.btn_refresh_profiles)
-        profiles_layout.addLayout(profiles_buttons)
-        
-        grp_profiles.setLayout(profiles_layout)
-        top_panel.addWidget(grp_profiles)
-        
-        # Группа: Режимы
-        grp_modes = QGroupBox("Режимы частотности")
-        modes_layout = QVBoxLayout()
-        self.chk_ws = QCheckBox("WS (базовая)")
+        settings_layout.addWidget(self.btn_refresh_profiles)
+
+        # Режимы
+        self.chk_ws = QCheckBox("WS")
         self.chk_ws.setChecked(True)
-        self.chk_qws = QCheckBox('"WS" (в кавычках)')
-        self.chk_bws = QCheckBox("!WS (точная)")
-        modes_layout.addWidget(self.chk_ws)
-        modes_layout.addWidget(self.chk_qws)
-        modes_layout.addWidget(self.chk_bws)
-        grp_modes.setLayout(modes_layout)
-        top_panel.addWidget(grp_modes)
-        
-        # Группа: Регионы
-        grp_geo = QGroupBox("Регионы")
-        geo_layout = QVBoxLayout()
+        self.chk_qws = QCheckBox('"WS"')
+        self.chk_bws = QCheckBox("!WS")
+        settings_layout.addWidget(QLabel("Режимы:"))
+        settings_layout.addWidget(self.chk_ws)
+        settings_layout.addWidget(self.chk_qws)
+        settings_layout.addWidget(self.chk_bws)
+
+        # Регионы
         self.geo_tree = GeoTree()
-        self.geo_tree.setMaximumHeight(120)
-        geo_layout.addWidget(self.geo_tree)
-        grp_geo.setLayout(geo_layout)
-        top_panel.addWidget(grp_geo)
-        
-        layout.addLayout(top_panel)
-        
-        # Разделитель
-        splitter = QSplitter(Qt.Vertical)
-        
-        # Верхняя часть - фразы и результаты
-        top_widget = QWidget()
-        top_layout = QVBoxLayout(top_widget)
-        
-        # Фразы
-        phrases_group = QGroupBox("Фразы для парсинга")
-        phrases_layout = QVBoxLayout()
-        self.phrases_edit = QTextEdit()
-        self.phrases_edit.setPlaceholderText("Введите фразы (каждая с новой строки)")
-        phrases_layout.addWidget(self.phrases_edit)
-        
-        # Кнопки управления
+        self.geo_tree.setMaximumHeight(80)
+        settings_layout.addWidget(QLabel("Регионы:"))
+        settings_layout.addWidget(self.geo_tree)
+
+        left_layout.addWidget(settings_group)
+        left_layout.addStretch()
+
+        # ───────────────────────────────────────────────────────────
+        # ЦЕНТРАЛЬНАЯ КОЛОНКА (80%) - Основная таблица
+        # ───────────────────────────────────────────────────────────
+        center_panel = QWidget()
+        center_layout = QVBoxLayout(center_panel)
+        center_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Кнопки управления парсингом
         control_buttons = QHBoxLayout()
-        self.btn_run = QPushButton("🚀 Запустить многопоточный парсинг")
-        self.btn_run.setStyleSheet("QPushButton { font-weight: bold; padding: 10px; }")
-        self.btn_stop = QPushButton("⏹ Остановить")
+        self.btn_run = QPushButton("🚀 Запустить парсинг")
+        self.btn_run.setStyleSheet("QPushButton { font-weight: bold; padding: 8px; }")
+        self.btn_stop = QPushButton("⏹ Стоп")
         self.btn_stop.setEnabled(False)
-        self.btn_export = QPushButton("💾 Экспорт результатов")
-        
+
         control_buttons.addWidget(self.btn_run)
         control_buttons.addWidget(self.btn_stop)
-        control_buttons.addWidget(self.btn_export)
-        phrases_layout.addLayout(control_buttons)
-        
+        control_buttons.addStretch()
+
         # Прогресс
         self.progress = QProgressBar()
         self.progress.setVisible(False)
-        phrases_layout.addWidget(self.progress)
-        
-        phrases_group.setLayout(phrases_layout)
-        top_layout.addWidget(phrases_group)
-        
-        # Таблица результатов
-        results_group = QGroupBox("Результаты парсинга")
-        results_layout = QVBoxLayout()
-        
+        control_buttons.addWidget(self.progress)
+
+        center_layout.addLayout(control_buttons)
+
+        # ОСНОВНАЯ ТАБЛИЦА с результатами
         self.table = QTableWidget()
-        self.table.setColumnCount(8)
+        self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels([
-            "Фраза", "WS", '"WS"', "!WS", "Статус", "Профиль", "Время", "Действия"
+            "№", "Фраза", "Частотность", "Статус"
         ])
-        results_layout.addWidget(self.table)
-        
-        results_group.setLayout(results_layout)
-        top_layout.addWidget(results_group)
-        
-        splitter.addWidget(top_widget)
-        
-        # Нижняя часть - журнал активности
-        log_group = QGroupBox("📋 Журнал активности (логи всех профилей)")
-        log_layout = QVBoxLayout()
-        
+
+        # Размеры колонок - ФРАЗА самая широкая!
+        self.table.setColumnWidth(0, 40)    # № - узкая
+        self.table.setColumnWidth(1, 500)   # Фраза - ШИРОКАЯ (основная)
+        self.table.setColumnWidth(2, 120)   # Частотность
+        self.table.setColumnWidth(3, 80)    # Статус
+
+        # Настройки таблицы
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.MultiSelection)
+        self.table.setMinimumHeight(400)
+
+        center_layout.addWidget(self.table)
+
+        # Поле ввода фраз (компактное, под таблицей)
+        phrases_label = QLabel("Добавить фразы:")
+        self.phrases_edit = QTextEdit()
+        self.phrases_edit.setMaximumHeight(80)
+        self.phrases_edit.setPlaceholderText("Введите фразы (каждая с новой строки)")
+
+        center_layout.addWidget(phrases_label)
+        center_layout.addWidget(self.phrases_edit)
+
+        # ───────────────────────────────────────────────────────────
+        # ПРАВАЯ КОЛОНКА (10%) - Группы фраз
+        # ───────────────────────────────────────────────────────────
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+
+        right_layout.addWidget(QLabel("Группы фраз"))
+
+        self.groups_list = QListWidget()
+        self.groups_list.addItem("✓ Все фразы")
+        self.groups_list.addItem("✓ Группа 1")
+        self.groups_list.addItem("✗ Группа 2")
+
+        right_layout.addWidget(self.groups_list)
+
+        self.btn_new_group = QPushButton("➕ Новая")
+        right_layout.addWidget(self.btn_new_group)
+
+        right_layout.addStretch()
+
+        # Добавляем колонки в splitter
+        splitter_main.addWidget(left_panel)
+        splitter_main.addWidget(center_panel)
+        splitter_main.addWidget(right_panel)
+
+        # Пропорции: Левая ~80px, Центр ~800px, Правая ~120px
+        splitter_main.setSizes([100, 800, 120])
+
+        main_layout.addWidget(splitter_main)
+
+        # ═══════════════════════════════════════════════════════════
+        # 3️⃣ BOTTOM JOURNAL - журнал внизу
+        # ═══════════════════════════════════════════════════════════
+        journal_group = QGroupBox("📋 Журнал активности")
+        journal_layout = QVBoxLayout(journal_group)
+
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
-        self.log_text.setMaximumHeight(200)
+        self.log_text.setMaximumHeight(150)
         self.log_text.setStyleSheet("""
             QTextEdit {
                 background-color: #1e1e1e;
                 color: #00ff00;
                 font-family: 'Consolas', 'Monaco', monospace;
-                font-size: 10pt;
+                font-size: 9pt;
             }
         """)
-        log_layout.addWidget(self.log_text)
-        
+
+        journal_layout.addWidget(self.log_text)
+
         # Кнопка очистки логов
         self.btn_clear_log = QPushButton("Очистить журнал")
-        log_layout.addWidget(self.btn_clear_log)
-        
-        log_group.setLayout(log_layout)
-        splitter.addWidget(log_group)
-        
-        # Устанавливаем пропорции разделителя
-        splitter.setSizes([400, 200])
-        
-        layout.addWidget(splitter)
+        journal_layout.addWidget(self.btn_clear_log)
+
+        main_layout.addWidget(journal_group)
         
     def _wire_signals(self):
         """Подключение сигналов"""
+        # TOP PANEL кнопки
+        self.btn_add.clicked.connect(self._on_add_phrases)
+        self.btn_delete.clicked.connect(self._on_delete_phrases)
+        self.btn_ws.clicked.connect(self._on_run_clicked)  # Частотка = запуск парсинга
+        self.btn_batch.clicked.connect(self._on_batch_parsing)
+        self.btn_forecast.clicked.connect(self._on_forecast)
+        self.btn_clear.clicked.connect(self._on_clear_results)
+        self.btn_export.clicked.connect(self._on_export_clicked)
+
+        # Кнопки управления парсингом
         self.btn_run.clicked.connect(self._on_run_clicked)
         self.btn_stop.clicked.connect(self._on_stop_clicked)
-        self.btn_export.clicked.connect(self._on_export_clicked)
-        self.btn_select_all.clicked.connect(self._select_all_profiles)
-        self.btn_deselect_all.clicked.connect(self._deselect_all_profiles)
+
+        # Левая панель - управление выбором строк
+        self.btn_select_all_rows.clicked.connect(self._select_all_rows)
+        self.btn_deselect_all_rows.clicked.connect(self._deselect_all_rows)
+        self.btn_invert_selection.clicked.connect(self._invert_selection)
+
+        # Профили
         self.btn_refresh_profiles.clicked.connect(self._refresh_profiles)
+
+        # Правая панель - группы
+        self.btn_new_group.clicked.connect(self._on_new_group)
+
+        # Журнал
         self.btn_clear_log.clicked.connect(self.log_text.clear)
         
     def _refresh_profiles(self):
@@ -554,45 +709,44 @@ class ParsingTab(QWidget):
         return aggregated
 
     def _populate_results(self, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Отобразить результаты в таблице, обновить панели и вернуть нормализованные строки."""
+        """Обновить результаты в таблице (заполнить частотность и статус)."""
         normalized_rows: List[Dict[str, Any]] = []
-        self.table.setRowCount(0)
 
+        # Создаём словарь результатов по фразам для быстрого поиска
+        results_map = {}
         for record in rows:
             phrase = str(record.get("phrase", ""))
             ws_value = record.get("ws", "")
-            qws_value = record.get("qws", "")
-            bws_value = record.get("bws", "")
             status_value = record.get("status", "")
-            profile_value = record.get("profile", "")
-            timestamp_value = record.get("time") or time.strftime("%H:%M:%S")
+            results_map[phrase] = {
+                "ws": str(ws_value) if ws_value is not None else "",
+                "status": str(status_value) if status_value else "OK"
+            }
 
-            row_idx = self.table.rowCount()
-            self.table.insertRow(row_idx)
-            values = [
-                phrase,
-                str(ws_value) if ws_value is not None else "",
-                str(qws_value) if qws_value is not None else "",
-                str(bws_value) if bws_value is not None else "",
-                str(status_value),
-                str(profile_value),
-                str(timestamp_value),
-                "⋯",
-            ]
-            for col, value in enumerate(values):
-                self.table.setItem(row_idx, col, QTableWidgetItem(value))
+        # Обновляем существующие строки в таблице
+        for row in range(self.table.rowCount()):
+            phrase_item = self.table.item(row, 1)
+            if phrase_item:
+                phrase = phrase_item.text()
 
-            normalized_rows.append(
-                {
-                    "phrase": phrase,
-                    "ws": values[1],
-                    "qws": values[2],
-                    "bws": values[3],
-                    "status": values[4],
-                    "profile": values[5],
-                    "time": values[6],
-                }
-            )
+                # Если для этой фразы есть результат - обновляем
+                if phrase in results_map:
+                    result = results_map[phrase]
+
+                    # Колонка 2: Частотность
+                    self.table.setItem(row, 2, QTableWidgetItem(result["ws"]))
+
+                    # Колонка 3: Статус
+                    status_text = "✓" if result["status"] == "OK" and result["ws"] else "⏱"
+                    self.table.setItem(row, 3, QTableWidgetItem(status_text))
+
+                    normalized_rows.append({
+                        "phrase": phrase,
+                        "ws": result["ws"],
+                        "status": result["status"],
+                    })
+
+        self._append_log(f"📊 Обновлено результатов: {len(normalized_rows)}")
 
         if self._keys_panel:
             groups = defaultdict(list)
@@ -610,13 +764,115 @@ class ParsingTab(QWidget):
             self._keys_panel.load_groups(groups)
 
         return normalized_rows
-        
+
+    # ═══════════════════════════════════════════════════════════
+    # Функции управления выбором строк (левая панель)
+    # ═══════════════════════════════════════════════════════════
+
+    def _select_all_rows(self):
+        """Выбрать все строки в таблице"""
+        self.table.selectAll()
+        self._append_log(f"✓ Выбрано строк: {self.table.rowCount()}")
+
+    def _deselect_all_rows(self):
+        """Снять выбор со всех строк"""
+        self.table.clearSelection()
+        self._append_log("✗ Выбор снят")
+
+    def _invert_selection(self):
+        """Инвертировать выбор строк"""
+        for row in range(self.table.rowCount()):
+            if self.table.item(row, 0).isSelected():
+                self.table.item(row, 0).setSelected(False)
+            else:
+                self.table.selectRow(row)
+        selected_count = len(self.table.selectionModel().selectedRows())
+        self._append_log(f"🔄 Выбор инвертирован ({selected_count} строк)")
+
+    # ═══════════════════════════════════════════════════════════
+    # Функции TOP PANEL (основные действия)
+    # ═══════════════════════════════════════════════════════════
+
+    def _on_add_phrases(self):
+        """Добавить фразы из поля ввода в таблицу"""
+        text = self.phrases_edit.toPlainText().strip()
+        if not text:
+            self._append_log("❌ Нет фраз для добавления")
+            return
+
+        phrases = [line.strip() for line in text.splitlines() if line.strip()]
+
+        for phrase in phrases:
+            row_idx = self.table.rowCount()
+            self.table.insertRow(row_idx)
+
+            # № (номер строки)
+            self.table.setItem(row_idx, 0, QTableWidgetItem(str(row_idx + 1)))
+
+            # Фраза
+            self.table.setItem(row_idx, 1, QTableWidgetItem(phrase))
+
+            # Частотность (пусто)
+            self.table.setItem(row_idx, 2, QTableWidgetItem(""))
+
+            # Статус
+            self.table.setItem(row_idx, 3, QTableWidgetItem("—"))
+
+        self.phrases_edit.clear()
+        self._append_log(f"➕ Добавлено фраз: {len(phrases)} (всего: {self.table.rowCount()})")
+
+    def _on_delete_phrases(self):
+        """Удалить выбранные фразы из таблицы"""
+        selected_rows = sorted([idx.row() for idx in self.table.selectionModel().selectedRows()], reverse=True)
+
+        if not selected_rows:
+            self._append_log("❌ Нет выбранных строк для удаления")
+            return
+
+        for row in selected_rows:
+            self.table.removeRow(row)
+
+        # Перенумеровать строки
+        for row in range(self.table.rowCount()):
+            self.table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
+
+        self._append_log(f"❌ Удалено строк: {len(selected_rows)} (осталось: {self.table.rowCount()})")
+
+    def _on_clear_results(self):
+        """Очистить все результаты из таблицы"""
+        row_count = self.table.rowCount()
+        self.table.setRowCount(0)
+        self._append_log(f"🗑️ Таблица очищена ({row_count} строк удалено)")
+
+    def _on_batch_parsing(self):
+        """Пакетный парсинг - заглушка"""
+        self._append_log("📦 Пакетный парсинг (в разработке)")
+
+    def _on_forecast(self):
+        """Прогноз бюджета - заглушка"""
+        self._append_log("💰 Прогноз бюджета (в разработке)")
+
+    def _on_new_group(self):
+        """Создать новую группу - заглушка"""
+        self._append_log("➕ Создание новой группы (в разработке)")
+
+    # ═══════════════════════════════════════════════════════════
+    # Парсинг
+    # ═══════════════════════════════════════════════════════════
+
     def _on_run_clicked(self):
         """Запуск многопоточного парсинга"""
-        # Получаем фразы
-        phrases = [line.strip() for line in self.phrases_edit.toPlainText().splitlines() if line.strip()]
+        # Получаем фразы из таблицы (колонка 1 - "Фраза")
+        phrases = []
+        for row in range(self.table.rowCount()):
+            phrase_item = self.table.item(row, 1)
+            if phrase_item:
+                phrase = phrase_item.text().strip()
+                if phrase:
+                    phrases.append(phrase)
+
         if not phrases:
-            self._append_log("❌ Нет фраз для парсинга")
+            self._append_log("❌ Нет фраз для парсинга (добавьте фразы через кнопку '➕ Добавить')")
             return
             
         # Получаем выбранные профили
@@ -624,6 +880,25 @@ class ParsingTab(QWidget):
         if not selected_profiles:
             self._append_log("❌ Не выбраны профили для парсинга")
             return
+
+        # Подробный отчёт перед стартом
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self._append_log(f"⏰ Время запуска: {timestamp}")
+        self._append_log("🔄 Подготовка профилей и кук...")
+
+        for profile_info in selected_profiles:
+            cookie_count, cookie_error = _probe_profile_cookies(profile_info)
+            proxy_value = profile_info.get("proxy") or "без прокси"
+            if cookie_count >= 0:
+                profile_info["cookie_count"] = cookie_count
+                self._append_log(
+                    f"   • {profile_info.get('email', 'unknown')} → прокси {proxy_value}, куки {cookie_count} шт"
+                )
+            else:
+                profile_info["cookie_count"] = None
+                self._append_log(
+                    f"   • {profile_info.get('email', 'unknown')} → прокси {proxy_value}, куки не прочитаны ({cookie_error})"
+                )
             
         # Режимы парсинга
         modes = {
@@ -648,6 +923,7 @@ class ParsingTab(QWidget):
         self._append_log(f"📊 Профилей: {len(selected_profiles)}")
         self._append_log(f"📝 Фраз: {len(phrases)}")
         self._append_log("=" * 70)
+        self._append_log("ℹ️ Загрузка сессионных куки обрабатывается turbo_parser_improved.load_cookies_from_profile_to_context")
         
         # Создаем многопоточный воркер
         self._worker = MultiParsingWorker(
@@ -719,37 +995,60 @@ class ParsingTab(QWidget):
         self.save_session_state(partial_results=normalized_rows)
         
     def _on_export_clicked(self):
-        """Экспорт результатов"""
+        """Экспорт результатов в CSV с 2 колонками: Фраза и Частотность"""
         if self.table.rowCount() == 0:
             self._append_log("❌ Нет результатов для экспорта")
             return
-            
+
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Экспорт результатов",
             f"parsing_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             "CSV Files (*.csv);;All Files (*)"
         )
-        
+
         if file_path:
             try:
                 import csv
+
+                # Собираем данные: фраза + WS (колонка 0 и 1)
+                export_data = []
+                for row in range(self.table.rowCount()):
+                    phrase_item = self.table.item(row, 0)  # Колонка "Фраза"
+                    ws_item = self.table.item(row, 1)      # Колонка "WS"
+
+                    if phrase_item and ws_item:
+                        phrase = phrase_item.text()
+                        ws_text = ws_item.text()
+
+                        # Конвертируем частотность в число
+                        try:
+                            ws_value = int(float(ws_text)) if ws_text else 0
+                        except (ValueError, TypeError):
+                            ws_value = 0
+
+                        export_data.append({
+                            'phrase': phrase,
+                            'frequency': ws_value
+                        })
+
+                # Сортируем по частотности (по убыванию - самые популярные сверху)
+                export_data.sort(key=lambda x: x['frequency'], reverse=True)
+
+                # Записываем в CSV с TAB разделителем для надёжности
+                # TAB предпочтительнее запятой, т.к. в фразах могут быть запятые
                 with open(file_path, 'w', newline='', encoding='utf-8-sig') as f:
-                    writer = csv.writer(f)
-                    # Заголовки
-                    headers = []
-                    for col in range(self.table.columnCount()):
-                        headers.append(self.table.horizontalHeaderItem(col).text())
-                    writer.writerow(headers)
-                    
+                    writer = csv.writer(f, delimiter='\t', quoting=csv.QUOTE_MINIMAL)
+
+                    # Заголовки (только 2 колонки)
+                    writer.writerow(['Фраза', 'Частотность'])
+
                     # Данные
-                    for row in range(self.table.rowCount()):
-                        row_data = []
-                        for col in range(self.table.columnCount()):
-                            item = self.table.item(row, col)
-                            row_data.append(item.text() if item else "")
-                        writer.writerow(row_data)
-                        
+                    for item in export_data:
+                        writer.writerow([item['phrase'], item['frequency']])
+
                 self._append_log(f"✅ Результаты экспортированы: {file_path}")
+                self._append_log(f"📊 Экспортировано {len(export_data)} записей")
+
             except Exception as e:
                 self._append_log(f"❌ Ошибка экспорта: {str(e)}")

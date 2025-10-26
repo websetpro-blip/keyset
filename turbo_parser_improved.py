@@ -42,11 +42,13 @@ try:
     from keyset.services.multiparser_manager import (
         load_cookies_from_db_to_context,
         save_cookies_to_db,
+        load_cookies_from_profile_to_context,
     )
 except ImportError:  # pragma: no cover - fallback for scripts
     from services.multiparser_manager import (  # type: ignore
         load_cookies_from_db_to_context,
         save_cookies_to_db,
+        load_cookies_from_profile_to_context,
     )
 
 # Настройка логирования
@@ -65,9 +67,34 @@ BATCH_SIZE = 50  # Размер батча фраз
 DELAY_BETWEEN_TABS = 0.3  # Задержка между загрузкой вкладок (сек)
 DELAY_BETWEEN_QUERIES = 0.5  # Задержка между запросами (сек)
 RESPONSE_TIMEOUT = 3000  # Таймаут ожидания ответа API (мс)
+RESPONSE_WAIT_TIMEOUT = 10.0  # Максимальное ожидание ответа Wordstat (сек)
 WORDSTAT_LOAD_TIMEOUT_MS = 30000  # Таймаут загрузки Wordstat (мс)
 WORDSTAT_MAX_ATTEMPTS = 3  # Количество попыток загрузки вкладки
 WORDSTAT_RETRY_DELAY_BASE = 1.5  # Базовая задержка между повторными попытками (сек)
+
+
+def log_parsing_debug(entry: Dict[str, Any]) -> None:
+    """
+    Сохраняет детальные логи парсинга в JSONL файл для отладки.
+
+    Каждая запись содержит:
+      - timestamp: ISO формат времени
+      - account: имя аккаунта
+      - tab: номер вкладки
+      - phrase: фраза
+      - status: статус этапа (started, input_found, enter_pressed, api_wait, success, timeout, error)
+      - message: описание
+      - ws: частотность (если получена)
+      - elapsed: время выполнения этапа в секундах (если применимо)
+      - error: текст ошибки (если есть)
+    """
+    debug_log_file = LOG_DIR / 'parsing_debug.jsonl'
+
+    try:
+        with open(debug_log_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+    except Exception as e:
+        logging.error(f"Ошибка записи debug лога: {e}")
 
 
 def parse_proxy_fallback(uri: str) -> Optional[dict]:
@@ -151,28 +178,60 @@ def has_yandex_cookie(cookies: List[Dict[str, Any]]) -> bool:
 async def verify_authorization(page: Page, account_name: str, logger: logging.Logger) -> bool:
     """Убедиться, что пользователь авторизован на Wordstat."""
     try:
-        try:
-            await page.wait_for_selector('button:has-text("Выход")', timeout=3000)
-            logger.info(f"[{account_name}] ✓ Авторизация подтверждена (найдена кнопка 'Выход')")
-            return True
-        except Exception:
-            pass
-
         current_url = page.url or ""
-        if "passport.yandex" in current_url or "login" in current_url:
+        logger.info(f"[{account_name}] Проверка авторизации на URL: {current_url}")
+
+        # Если редирект на страницу логина - точно не авторизован
+        if "passport.yandex" in current_url or "/auth" in current_url:
             logger.error(f"[{account_name}] ❌ Требуется авторизация (редирект на {current_url})")
             return False
 
-        try:
-            profile_elem = await page.query_selector('[data-testid="profile"]')
-            if profile_elem:
-                logger.info(f"[{account_name}] ✓ Элемент профиля найден")
-                return True
-        except Exception:
-            pass
+        # Если мы на wordstat.yandex.ru - пробуем разные проверки
+        if "wordstat.yandex.ru" in current_url:
+            logger.info(f"[{account_name}] Находимся на Wordstat, проверяю элементы авторизации...")
 
-        logger.warning(f"[{account_name}] ⚠️ Не удалось однозначно определить статус авторизации")
+            # Проверка 1: Кнопка "Выход"
+            try:
+                await page.wait_for_selector('button:has-text("Выход")', timeout=2000)
+                logger.info(f"[{account_name}] ✓ Авторизация подтверждена (найдена кнопка 'Выход')")
+                return True
+            except Exception:
+                logger.debug(f"[{account_name}] Кнопка 'Выход' не найдена")
+
+            # Проверка 2: Элемент профиля
+            try:
+                profile_elem = await page.query_selector('[data-testid="profile"]')
+                if profile_elem:
+                    logger.info(f"[{account_name}] ✓ Элемент профиля найден")
+                    return True
+            except Exception:
+                pass
+
+            # Проверка 3: Поле поиска Wordstat (если есть - значит авторизован)
+            try:
+                search_input = await page.query_selector('input[name="text"]')
+                if search_input:
+                    logger.info(f"[{account_name}] ✓ Поле поиска найдено, считаем авторизованным")
+                    return True
+            except Exception:
+                pass
+
+            # Проверка 4: Любой элемент с классом, содержащим 'user' или 'account'
+            try:
+                user_elem = await page.query_selector('[class*="user"], [class*="account"]')
+                if user_elem:
+                    logger.info(f"[{account_name}] ✓ Элемент пользователя найден")
+                    return True
+            except Exception:
+                pass
+
+            # Если на wordstat.yandex.ru и нет редиректа на логин - скорее всего авторизован
+            logger.info(f"[{account_name}] ✓ На Wordstat без редиректа на логин - считаем авторизованным")
+            return True
+
+        logger.warning(f"[{account_name}] ⚠️ Неожиданный URL: {current_url}")
         return False
+
     except Exception as exc:
         logger.error(f"[{account_name}] ⚠️ Ошибка проверки авторизации: {exc}")
         return False
@@ -262,6 +321,7 @@ class TurboParser:
         self.logger.info(f"Профиль: {self.profile_path}")
         self.logger.info("=" * 70)
         self.logger.info(f"Загружено фраз: {total_phrases}")
+        self.logger.info(f"[Parser] НАЧАЛО парсинга. Фраз: {len(self.phrases)}")
         
         if duplicates_count:
             self.logger.warning(
@@ -310,8 +370,25 @@ class TurboParser:
                 loaded_from_db = await load_cookies_from_db_to_context(context, self.account_name, self.logger)
                 if loaded_from_db:
                     cookies = await context.cookies()
-                else:
-                    self.logger.error(f"[{self.account_name}] ❌ Куки не загружены, может потребоваться ручная авторизация")
+                    if has_yandex_cookie(cookies):
+                        self.logger.info(f"[{self.account_name}] ✓ Куки загружены из БД")
+
+                if not has_yandex_cookie(cookies):
+                    self.logger.warning(f"[{self.account_name}] Куки Яндекс не найдены в БД — пробую извлечь из профиля на диске")
+                    loaded_from_profile = await load_cookies_from_profile_to_context(
+                        context=context,
+                        account_name=self.account_name,
+                        profile_path=self.profile_path,
+                        logger_obj=self.logger,
+                        persist=True,
+                    )
+                    if loaded_from_profile:
+                        cookies = await context.cookies()
+                        if has_yandex_cookie(cookies):
+                            self.logger.info(f"[{self.account_name}] ✓ Куки восстановлены из локального профиля")
+
+                if not has_yandex_cookie(cookies):
+                    self.logger.error(f"[{self.account_name}] ✗ Куки не найдены — может потребоваться ручная авторизация")
             else:
                 self.logger.info(f"[{self.account_name}] ✓ Куки найдены, продолжаем")
 
@@ -328,11 +405,26 @@ class TurboParser:
                 await context.close()
                 return {}
 
-            if not await verify_authorization(page, self.account_name, self.logger):
-                self.logger.error(f"[{self.account_name}] ❌ Профиль не авторизован — парсинг остановлен")
+            # Проверка авторизации - если куки есть, делаем мягкую проверку
+            auth_ok = await verify_authorization(page, self.account_name, self.logger)
+
+            # Если проверка не прошла, но у нас есть куки Яндекса - даём второй шанс
+            if not auth_ok and has_yandex_cookie(cookies):
+                self.logger.warning(f"[{self.account_name}] ⚠️ Строгая проверка авторизации не прошла, но куки Яндекса есть")
+                self.logger.info(f"[{self.account_name}] Пытаюсь продолжить парсинг с имеющимися куками...")
+                auth_ok = True  # Даём шанс попробовать с куками
+
+            if not auth_ok:
+                self.logger.error(f"[{self.account_name}] ❌ Профиль не авторизован — ожидаю ручной вход")
                 log_manual_authorization_instructions(self.logger, self.account_name, self.profile_path)
-                await context.close()
-                return {}
+                try:
+                    await page.wait_for_selector('button:has-text("Выход")', timeout=600_000)
+                    self.logger.info(f"[{self.account_name}] ✓ Ручная авторизация выполнена, продолжаю")
+                    await save_cookies_to_db(self.account_name, context, self.logger)
+                except Exception:
+                    self.logger.error(f"[{self.account_name}] ❌ Ручная авторизация не выполнена за отведённое время")
+                    await context.close()
+                    return {}
 
             pages: List[Page] = [page]
             self.logger.info(f"[2/6] Создание дополнительных вкладок...")
@@ -417,7 +509,7 @@ class TurboParser:
                             phrase = payload.get("searchValue")
                         except json.JSONDecodeError:
                             pass
-                    
+
                     freq = (
                         data.get("totalValue")
                         or data.get("data", {}).get("totalValue")
@@ -427,6 +519,21 @@ class TurboParser:
                         async with results_lock:
                             self.results[phrase] = freq
                             self.logger.debug(f"  [API] '{phrase}' = {freq}")
+
+                        # ЛОГ: API ответ получен
+                        api_log_entry = {
+                            'timestamp': datetime.now().isoformat(),
+                            'account': self.account_name,
+                            'tab': 'API',
+                            'phrase': phrase,
+                            'status': 'api_response_received',
+                            'message': f'API ответ получен: {freq}',
+                            'ws': freq,
+                            'api_url': response.url,
+                            'api_status': response.status
+                        }
+                        log_parsing_debug(api_log_entry)
+
                 except Exception as e:
                     self.logger.error(f"Error handling response: {e}")
             
@@ -449,69 +556,209 @@ class TurboParser:
             # 6. ПАРСИНГ
             self.logger.info(f"[6/6] Запуск парсинга {len(self.phrases)} фраз...\n")
             start_time = time.time()
+            stats = {"processed": 0, "timeouts": 0, "errors": 0}
+            stats_lock = asyncio.Lock()
             
             async def parse_tab(
                 page: Page,
                 tab_phrases: List[str],
                 tab_index: int,
             ):
-                for phrase in tab_phrases:
+                for index, phrase in enumerate(tab_phrases, start=1):
                     if phrase in self.results:
                         continue
-                    
+
+                    # Инициализируем debug лог для фразы
+                    log_entry = {
+                        'timestamp': datetime.now().isoformat(),
+                        'account': self.account_name,
+                        'tab': tab_index + 1,
+                        'phrase': phrase,
+                        'status': 'started',
+                        'message': f'[TAB {tab_index + 1}] Начало парсинга: "{phrase}"'
+                    }
+                    log_parsing_debug(log_entry)
+
                     while True:
                         try:
-                            # Ищем поле ввода
                             input_selectors = [
                                 "input[name='text']",
                                 "input[placeholder]",
                                 ".b-form-input__input",
                             ]
+                            self.logger.info(
+                                f"  [TAB {tab_index + 1}] ▶️ [{index}/{len(tab_phrases)}] '{phrase}'"
+                            )
+                            self.logger.debug(
+                                f"  [TAB {tab_index + 1}] Ищу поле ввода среди {len(input_selectors)} селекторов"
+                            )
+
+                            # ЛОГ: Поиск поля ввода
+                            t_input_start = time.time()
                             input_field = None
                             for selector in input_selectors:
                                 try:
                                     locator = page.locator(selector)
                                     if await locator.count() > 0:
                                         input_field = locator.first
+                                        elapsed_input = time.time() - t_input_start
+                                        log_entry.update({
+                                            'timestamp': datetime.now().isoformat(),
+                                            'status': 'input_found',
+                                            'message': f'Поле ввода найдено: {selector}',
+                                            'selector': selector,
+                                            'elapsed': round(elapsed_input, 3)
+                                        })
+                                        log_parsing_debug(log_entry)
                                         break
                                 except Exception:
                                     continue
-                            
+
                             if not input_field:
+                                self.logger.warning(
+                                    f"  [TAB {tab_index + 1}] ⚠️ Поле ввода не найдено для '{phrase}'"
+                                )
+                                # ЛОГ: Поле ввода не найдено
+                                log_entry.update({
+                                    'timestamp': datetime.now().isoformat(),
+                                    'status': 'error_no_input',
+                                    'message': 'Поле ввода НЕ НАЙДЕНО',
+                                    'ws': 0
+                                })
+                                log_parsing_debug(log_entry)
+                                async with stats_lock:
+                                    stats["errors"] += 1
+                                async with results_lock:
+                                    self.results.setdefault(phrase, 0)
                                 break
                             
-                            # Вводим фразу
+                            self.logger.debug(
+                                f"  [TAB {tab_index + 1}] ✓ Поле ввода найдено"
+                            )
+
+                            # ЛОГ: Ввод фразы
+                            t_type_start = time.time()
                             await input_field.clear()
+                            self.logger.debug(
+                                f"  [TAB {tab_index + 1}] Поле очищено, ввожу фразу"
+                            )
                             await input_field.fill(phrase)
+                            elapsed_type = time.time() - t_type_start
+                            log_entry.update({
+                                'timestamp': datetime.now().isoformat(),
+                                'status': 'phrase_typed',
+                                'message': 'Фраза введена в поле',
+                                'elapsed': round(elapsed_type, 3)
+                            })
+                            log_parsing_debug(log_entry)
+
+                            # ЛОГ: Нажатие Enter и отправка запроса
+                            self.logger.debug(
+                                f"  [TAB {tab_index + 1}] Отправляю запрос на Wordstat"
+                            )
+                            t_enter_start = time.time()
                             await input_field.press("Enter")
-                            
-                            # Ждем ответ
-                            timeout = 2.0
-                            start = time.time()
+                            elapsed_enter = time.time() - t_enter_start
+                            log_entry.update({
+                                'timestamp': datetime.now().isoformat(),
+                                'status': 'enter_pressed',
+                                'message': f'Enter нажат, запрос отправлен',
+                                'elapsed': round(elapsed_enter, 3)
+                            })
+                            log_parsing_debug(log_entry)
+
+                            # ЛОГ: Ожидание API ответа
+                            timeout = max(RESPONSE_WAIT_TIMEOUT, RESPONSE_TIMEOUT / 1000.0)
+                            t_api_start = time.time()
                             response_received = False
-                            
-                            while time.time() - start < timeout:
+
+                            log_entry.update({
+                                'timestamp': datetime.now().isoformat(),
+                                'status': 'api_waiting',
+                                'message': f'Ожидание API ответа (timeout={timeout:.1f}s)'
+                            })
+                            log_parsing_debug(log_entry)
+
+                            while time.time() - t_api_start < timeout:
                                 async with results_lock:
                                     if phrase in self.results:
                                         response_received = True
                                         break
                                 await asyncio.sleep(0.1)
-                            
+
+                            elapsed_api = time.time() - t_api_start
+
                             if response_received:
+                                value = self.results.get(phrase)
                                 self.logger.info(
-                                    f"  [TAB {tab_index + 1}] ✓ '{phrase}' = {self.results[phrase]}"
+                                    f"  [TAB {tab_index + 1}] ✓ '{phrase}' = {value}"
                                 )
+
+                                # ЛОГ: Успешное получение результата
+                                log_entry.update({
+                                    'timestamp': datetime.now().isoformat(),
+                                    'status': 'success',
+                                    'message': f'Частотность получена: {value}',
+                                    'ws': value,
+                                    'elapsed': round(elapsed_api, 3),
+                                    'api_received': True
+                                })
+                                log_parsing_debug(log_entry)
+
+                                async with stats_lock:
+                                    stats["processed"] += 1
                             else:
                                 self.logger.warning(
                                     f"  [TAB {tab_index + 1}] ⏱ '{phrase}' — timeout"
                                 )
+
+                                # ЛОГ: Таймаут API
+                                log_entry.update({
+                                    'timestamp': datetime.now().isoformat(),
+                                    'status': 'api_timeout',
+                                    'message': f'API таймаут после {elapsed_api:.2f}s ожидания',
+                                    'ws': 0,
+                                    'elapsed': round(elapsed_api, 3),
+                                    'api_received': False
+                                })
+                                log_parsing_debug(log_entry)
+
                                 async with results_lock:
                                     self.results[phrase] = 0
+                                self.logger.debug(
+                                    f"  [TAB {tab_index + 1}] размещено значение 0 для '{phrase}' после {timeout:.1f}с ожидания"
+                                )
+                                async with stats_lock:
+                                    stats["processed"] += 1
+                                    stats["timeouts"] += 1
                             
+                            async with stats_lock:
+                                processed_so_far = stats["processed"]
+                                timeouts_so_far = stats["timeouts"]
+                                errors_so_far = stats["errors"]
+                            self.logger.debug(
+                                f"  [TAB {tab_index + 1}] ✓ Завершена обработка '{phrase}' "
+                                f"(обработано: {processed_so_far}, таймаутов: {timeouts_so_far}, ошибок: {errors_so_far}, всего результатов: {len(self.results)})"
+                            )
                             break
-                            
+
                         except Exception as e:
-                            self.logger.error(f"Error parsing '{phrase}': {e}")
+                            self.logger.error(
+                                f"  [TAB {tab_index + 1}] ❌ Ошибка обработке '{phrase}': {type(e).__name__}: {e}"
+                            )
+
+                            # ЛОГ: Критическая ошибка
+                            log_entry.update({
+                                'timestamp': datetime.now().isoformat(),
+                                'status': 'critical_error',
+                                'message': f'КРИТИЧЕСКАЯ ОШИБКА: {type(e).__name__}',
+                                'ws': 0,
+                                'error': str(e)[:200]
+                            })
+                            log_parsing_debug(log_entry)
+
+                            async with stats_lock:
+                                stats["errors"] += 1
                             async with results_lock:
                                 self.results[phrase] = 0
                             break
@@ -541,6 +788,17 @@ class TurboParser:
             elapsed = time.time() - start_time
             parsed_count = len(self.results)
             speed = parsed_count / elapsed if elapsed > 0 else 0
+
+            async with stats_lock:
+                processed_total = stats["processed"]
+                timeouts_total = stats["timeouts"]
+                errors_total = stats["errors"]
+            self.logger.info("[Parser] ═════════════════════════════════════════════════════")
+            self.logger.info(f"[Parser] Фраз обработано: {processed_total}")
+            self.logger.info(f"[Parser] Таймаутов: {timeouts_total}")
+            self.logger.info(f"[Parser] Ошибок: {errors_total}")
+            self.logger.info(f"[Parser] Результатов найдено: {len(self.results)}")
+            self.logger.info("[Parser] ═════════════════════════════════════════════════════")
             
             self.logger.info("=" * 70)
             self.logger.info(f"ПАРСИНГ ЗАВЕРШЕН ({self.account_name})")
