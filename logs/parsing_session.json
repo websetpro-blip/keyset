@@ -1,40 +1,387 @@
 {
-  "timestamp": "2025-10-26T12:34:01.923637",
-  "phrases": [],
-  "modes": {
+  "timestamp": "2025-10-28T04:01:38.916806",
+  "phrases": [
+    "косметические капитальные",
+    "малярные капитальные",
+    "черновые капитальные",
+    "чистовые капитальные",
+    "финишные капитальные",
+    "окрасочные капитальные",
+    "покрасочные капитальные",
+    "отделка капитальные",
+    "отделочные капитальные",
+    "малярные косметические",
+    "черновые косметические",
+    "чистовые косметические",
+    "финишные косметические",
+    "окрасочные косметические",
+    "покрасочные косметические",
+    "отделка косметические",
+    "отделочные косметические",
+    "черновые малярные",
+    "чистовые малярные",
+    "финишные малярные",
+    "окрасочные малярные",
+    "покрасочные малярные",
+    "отделка малярные",
+    "отделочные малярные",
+    "чистовые черновые",
+    "финишные черновые",
+    "окрасочные черновые",
+    "покрасочные черновые",
+    "отделка черновые",
+    "отделочные черновые",
+    "финишные чистовые",
+    "окрасочные чистовые",
+    "покрасочные чистовые",
+    "отделка чистовые",
+    "отделочные чистовые",
+    "окрасочные финишные",
+    "покрасочные финишные",
+    "отделка финишные",
+    "отделочные финишные",
+    "покрасочные окрасочные",
+    "отделка окрасочные",
+    "отделочные окрасочные",
+    "отделка покрасочные",
+    "отделочные покрасочные",
+    "отделочные отделка"
+  ],
+  "settings": {
+    "collect_wordstat": true,
+    "modes": [
+      "ws"
+    ],
+    "regions_map": {
+      "225": "Россия"
+    },
+    "regions": [
+      225
+    ],
+    "region_names": [
+      "Россия"
+    ],
     "ws": true,
     "qws": false,
-    "bws": false
+    "bws": false,
+    "profiles": [],
+    "profile_emails": []
   },
-  "geo_ids": [
-    225
-  ],
-  "selected_profiles": [
+  "partial_results": [
     {
-      "email": "dsmismirnov",
-      "profile_path": "C:\\AI\\yandex\\.profiles\\wordstat_main",
-      "proxy": "http://TmNfbT:YFB5cE@77.73.134.166:8000"
+      "phrase": "отделочные капитальные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
     },
     {
-      "email": "kuznepetya",
-      "profile_path": "C:\\AI\\yandex\\.profiles\\kuznepetya",
-      "proxy": "TmNfbT:YFB5cE@77.73.134.166:8000"
+      "phrase": "окрасочные капитальные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
     },
     {
-      "email": "semenovmsemionov",
-      "profile_path": "C:\\AI\\yandex\\.profiles\\semenovmsemionov",
-      "proxy": "nDRYz5:EP0wPC@213.139.221.207:9393"
+      "phrase": "отделка капитальные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
     },
     {
-      "email": "vfefyodorov",
-      "profile_path": "C:\\AI\\yandex\\.profiles\\vfefyodorov",
-      "proxy": "nDRYz5:EP0wPC@213.139.221.207:9393"
+      "phrase": "чистовые капитальные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
     },
     {
-      "email": "volkovsvolkow",
-      "profile_path": "C:\\AI\\yandex\\.profiles\\volkovsvolkow",
-      "proxy": "nDRYz5:EP0wPC@213.139.222.51:9738"
+      "phrase": "черновые капитальные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "косметические капитальные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "покрасочные капитальные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "малярные капитальные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "финишные капитальные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "черновые малярные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "финишные косметические",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделка косметические",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "чистовые косметические",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделочные косметические",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "черновые косметические",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "малярные косметические",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "окрасочные косметические",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "покрасочные косметические",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "окрасочные черновые",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделочные малярные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "финишные малярные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "покрасочные малярные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "чистовые малярные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "финишные черновые",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "окрасочные малярные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделка малярные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "чистовые черновые",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "окрасочные финишные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "окрасочные чистовые",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "финишные чистовые",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделка черновые",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделочные черновые",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "покрасочные чистовые",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделка чистовые",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделочные чистовые",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "покрасочные черновые",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделочные отделка",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "покрасочные финишные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделочные финишные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделочные покрасочные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделка финишные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделка покрасочные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделочные окрасочные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "отделка окрасочные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
+    },
+    {
+      "phrase": "покрасочные окрасочные",
+      "region_id": 225,
+      "region_name": "Россия",
+      "ws": "",
+      "status": "OK"
     }
-  ],
-  "partial_results": []
+  ]
 }

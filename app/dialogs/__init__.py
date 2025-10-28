@@ -3,5 +3,4 @@
 Dialog helpers that are shared between tabs.
 """
 
-__all__ = ["geo_dialog", "batch_collect_dialog"]
-
+__all__ = ["geo_dialog", "batch_collect_dialog", "wordstat_settings_dialog", "wordstat_dropdown_widget"]

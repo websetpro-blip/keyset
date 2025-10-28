@@ -172,7 +172,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.parsing, "Парсинг")
 
         self.masks = self._instantiate_masks(
-            module="keyset.app.tabs.masks_tab",
+            module="keyset.app.tabs.maskstab",
             class_name="MasksTab",
             parent=self,
             fallback=lambda parent: QWidget(parent),

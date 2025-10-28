@@ -307,8 +307,37 @@ class TurboParser:
         self.phrases = phrases
         self.headless = headless
         self.proxy_uri = proxy_uri
+        self.region_id: int = 225
         self.results: Dict[str, Any] = {}
         self.logger = logging.getLogger(f"TurboParser.{account_name}")
+
+    def _inject_region_into_payload(self, payload: Any) -> None:
+        """
+        Рекурсивно проталкиваем выбранный region_id в известные ключи запроса Wordstat,
+        чтобы API гарантированно работало по нужному GEO.
+        """
+
+        region_id = self.region_id
+
+        def _apply(node: Any) -> None:
+            if isinstance(node, dict):
+                for key in ("lr", "region", "regionId", "geoId"):
+                    if key in node and not isinstance(node[key], (dict, list)):
+                        node[key] = region_id
+                for key in ("regions", "regionIds", "geoIds"):
+                    if key in node and isinstance(node[key], list):
+                        node[key] = [region_id]
+                for value in node.values():
+                    _apply(value)
+            elif isinstance(node, list):
+                for item in node:
+                    _apply(item)
+
+        _apply(payload)
+        if isinstance(payload, dict):
+            payload.setdefault("regions", [region_id])
+            payload.setdefault("regionId", region_id)
+            payload.setdefault("lr", region_id)
         
     async def run(self) -> Dict[str, Any]:
         """Запуск парсера"""
@@ -319,6 +348,7 @@ class TurboParser:
         self.logger.info("=" * 70)
         self.logger.info(f"ТУРБО-ПАРСЕР: 10 ВКЛАДОК ({self.account_name})")
         self.logger.info(f"Профиль: {self.profile_path}")
+        self.logger.info(f"Регион: {self.region_id}")
         self.logger.info("=" * 70)
         self.logger.info(f"Загружено фраз: {total_phrases}")
         self.logger.info(f"[Parser] НАЧАЛО парсинга. Фраз: {len(self.phrases)}")
@@ -360,6 +390,22 @@ class TurboParser:
             except Exception as e:
                 self.logger.error(f"Failed to launch browser: {e}")
                 raise
+
+            async def _enforce_region(route, request):
+                if request.method.upper() == "POST" and "/wordstat/api" in request.url:
+                    post_data = request.post_data or ""
+                    if post_data:
+                        try:
+                            payload = json.loads(post_data)
+                        except Exception:
+                            payload = None
+                        if isinstance(payload, dict):
+                            self._inject_region_into_payload(payload)
+                            await route.continue_(post_data=json.dumps(payload, ensure_ascii=False))
+                            return
+                await route.continue_()
+
+            await context.route("**/wordstat/api/**", _enforce_region)
 
             page = context.pages[0] if context.pages else await context.new_page()
             cookies = await context.cookies()
@@ -446,7 +492,7 @@ class TurboParser:
             self.logger.info(f"[3/6] Загрузка Wordstat во всех вкладках...")
             
             async def load_wordstat(page: Page, index: int) -> bool:
-                url = "https://wordstat.yandex.ru/?region=225"
+                url = f"https://wordstat.yandex.ru/?region={self.region_id}"
                 for attempt in range(1, WORDSTAT_MAX_ATTEMPTS + 1):
                     try:
                         await page.goto(
@@ -817,6 +863,7 @@ async def turbo_parser_10tabs(
     *,
     headless: bool = False,
     proxy_uri: Optional[str] = None,
+    region_id: int = 225,
 ) -> Dict[str, Any]:
     """
     Главная функция парсера для обратной совместимости
@@ -838,6 +885,7 @@ async def turbo_parser_10tabs(
         headless=headless,
         proxy_uri=proxy_uri
     )
+    parser.region_id = region_id
     return await parser.run()
 
 
@@ -848,6 +896,7 @@ def main():
     parser.add_argument("profile_path", help="Chrome profile path")
     parser.add_argument("phrases_file", help="File with phrases")
     parser.add_argument("--proxy", help="Proxy URI", default=None)
+    parser.add_argument("--region", type=int, default=225, help="Wordstat region id (lr)")
     parser.add_argument("--headless", action="store_true", help="Run in headless mode")
     
     args = parser.parse_args()
@@ -868,6 +917,7 @@ def main():
         headless=args.headless,
         proxy_uri=args.proxy
     )
+    parser.region_id = args.region
     
     # Запускаем
     results = asyncio.run(parser.run())

@@ -4,3 +4,6 @@ nltk==3.9.1
 sqlalchemy==2.0.36
 aiohttp==3.11.10
 aiohttp-socks==0.10.1
+xmindparser>=1.0.8
+pymorphy2>=0.9.1
+pyperclip>=1.8.2

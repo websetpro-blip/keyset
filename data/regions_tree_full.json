@@ -5,39 +5,5881 @@
     "children": [
       {
         "value": "3",
-        "label": "Центр"
+        "label": "Центр",
+        "children": [
+          {
+            "value": "1",
+            "label": "Москва и область",
+            "children": [
+              {
+                "value": "213",
+                "label": "Москва",
+                "children": [
+                  {
+                    "value": "216",
+                    "label": "Зеленоград",
+                    "children": []
+                  },
+                  {
+                    "value": "20674",
+                    "label": "Троицк",
+                    "children": []
+                  },
+                  {
+                    "value": "21624",
+                    "label": "Щербинка",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10716",
+                "label": "Балашиха",
+                "children": []
+              },
+              {
+                "value": "98598",
+                "label": "Богородский (городской округ)",
+                "children": [
+                  {
+                    "value": "10742",
+                    "label": "Ногинск",
+                    "children": []
+                  },
+                  {
+                    "value": "21656",
+                    "label": "Старая Купавна",
+                    "children": []
+                  },
+                  {
+                    "value": "21642",
+                    "label": "Электроугли",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10717",
+                "label": "Бронницы",
+                "children": []
+              },
+              {
+                "value": "98580",
+                "label": "Волоколамский район",
+                "children": [
+                  {
+                    "value": "10721",
+                    "label": "Волоколамск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98581",
+                "label": "Воскресенский район",
+                "children": [
+                  {
+                    "value": "21632",
+                    "label": "Белоозерский",
+                    "children": []
+                  },
+                  {
+                    "value": "10722",
+                    "label": "Воскресенск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98582",
+                "label": "Дмитровский городской округ",
+                "children": [
+                  {
+                    "value": "10723",
+                    "label": "Дмитров",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "214",
+                "label": "Долгопрудный",
+                "children": []
+              },
+              {
+                "value": "10725",
+                "label": "Домодедово",
+                "children": []
+              },
+              {
+                "value": "215",
+                "label": "Дубна",
+                "children": []
+              },
+              {
+                "value": "98584",
+                "label": "Егорьевск (городской округ)",
+                "children": [
+                  {
+                    "value": "10727",
+                    "label": "Егорьевск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "20571",
+                "label": "Жуковский",
+                "children": []
+              },
+              {
+                "value": "98585",
+                "label": "Зарайск (городской округ)",
+                "children": [
+                  {
+                    "value": "10728",
+                    "label": "Зарайск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10729",
+                "label": "Звенигород",
+                "children": []
+              },
+              {
+                "value": "98586",
+                "label": "Истра (городской округ)",
+                "children": [
+                  {
+                    "value": "21627",
+                    "label": "Дедовск",
+                    "children": []
+                  },
+                  {
+                    "value": "10731",
+                    "label": "Истра",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98587",
+                "label": "Кашира (городской округ)",
+                "children": [
+                  {
+                    "value": "10732",
+                    "label": "Кашира",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98588",
+                "label": "Клин (городской округ)",
+                "children": [
+                  {
+                    "value": "10733",
+                    "label": "Клин",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10734",
+                "label": "Коломна",
+                "children": []
+              },
+              {
+                "value": "20728",
+                "label": "Королёв",
+                "children": []
+              },
+              {
+                "value": "98590",
+                "label": "Красногорск (городской округ)",
+                "children": [
+                  {
+                    "value": "10735",
+                    "label": "Красногорск",
+                    "children": []
+                  },
+                  {
+                    "value": "21745",
+                    "label": "Нахабино",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "21647",
+                "label": "Краснознаменск",
+                "children": []
+              },
+              {
+                "value": "98591",
+                "label": "Ленинский район",
+                "children": [
+                  {
+                    "value": "10719",
+                    "label": "Видное",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "21641",
+                "label": "Лобня",
+                "children": []
+              },
+              {
+                "value": "21635",
+                "label": "Лосино-Петровский",
+                "children": []
+              },
+              {
+                "value": "98593",
+                "label": "Луховицы (городской округ)",
+                "children": [
+                  {
+                    "value": "10737",
+                    "label": "Луховицы",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "21630",
+                "label": "Лыткарино",
+                "children": []
+              },
+              {
+                "value": "98594",
+                "label": "Люберцы (городской округ)",
+                "children": [
+                  {
+                    "value": "21735",
+                    "label": "Дзержинский",
+                    "children": []
+                  },
+                  {
+                    "value": "10738",
+                    "label": "Люберцы",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98595",
+                "label": "Можайский (городской округ)",
+                "children": [
+                  {
+                    "value": "10739",
+                    "label": "Можайск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98596",
+                "label": "Мытищи (городской округ)",
+                "children": [
+                  {
+                    "value": "10740",
+                    "label": "Мытищи",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98597",
+                "label": "Наро-Фоминский городской округ",
+                "children": [
+                  {
+                    "value": "10715",
+                    "label": "Апрелевка",
+                    "children": []
+                  },
+                  {
+                    "value": "10741",
+                    "label": "Наро-Фоминск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98599",
+                "label": "Одинцовский район",
+                "children": [
+                  {
+                    "value": "21646",
+                    "label": "Голицыно",
+                    "children": []
+                  },
+                  {
+                    "value": "21625",
+                    "label": "Кубинка",
+                    "children": []
+                  },
+                  {
+                    "value": "10743",
+                    "label": "Одинцово",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10745",
+                "label": "Орехово-Зуево",
+                "children": []
+              },
+              {
+                "value": "98602",
+                "label": "Павловский Посад (городской округ)",
+                "children": [
+                  {
+                    "value": "10746",
+                    "label": "Павловский Посад",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10747",
+                "label": "Подольск",
+                "children": []
+              },
+              {
+                "value": "20576",
+                "label": "Протвино",
+                "children": []
+              },
+              {
+                "value": "98604",
+                "label": "Пушкинский район",
+                "children": [
+                  {
+                    "value": "21623",
+                    "label": "Ивантеевка",
+                    "children": []
+                  },
+                  {
+                    "value": "100471",
+                    "label": "Красноармейск",
+                    "children": []
+                  },
+                  {
+                    "value": "10748",
+                    "label": "Пушкино",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "217",
+                "label": "Пущино",
+                "children": []
+              },
+              {
+                "value": "98605",
+                "label": "Раменский район",
+                "children": [
+                  {
+                    "value": "10750",
+                    "label": "Раменское",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "21621",
+                "label": "Реутов",
+                "children": []
+              },
+              {
+                "value": "98606",
+                "label": "Рузский городской округ",
+                "children": [
+                  {
+                    "value": "10751",
+                    "label": "Руза",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98608",
+                "label": "Сергиево-Посадский район",
+                "children": [
+                  {
+                    "value": "10752",
+                    "label": "Сергиев Посад",
+                    "children": []
+                  },
+                  {
+                    "value": "21645",
+                    "label": "Хотьково",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10754",
+                "label": "Серпухов",
+                "children": []
+              },
+              {
+                "value": "98611",
+                "label": "Солнечногорский район",
+                "children": [
+                  {
+                    "value": "10755",
+                    "label": "Солнечногорск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98607",
+                "label": "Ступино (городской округ)",
+                "children": [
+                  {
+                    "value": "10756",
+                    "label": "Ступино",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "21619",
+                "label": "Фрязино",
+                "children": []
+              },
+              {
+                "value": "10758",
+                "label": "Химки",
+                "children": []
+              },
+              {
+                "value": "219",
+                "label": "Черноголовка",
+                "children": []
+              },
+              {
+                "value": "98614",
+                "label": "Чехов (городской округ)",
+                "children": [
+                  {
+                    "value": "10761",
+                    "label": "Чехов",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98615",
+                "label": "Шатура (городской округ)",
+                "children": [
+                  {
+                    "value": "10762",
+                    "label": "Шатура",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98617",
+                "label": "Щёлковский район",
+                "children": [
+                  {
+                    "value": "10765",
+                    "label": "Щёлково",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "20523",
+                "label": "Электросталь",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10645",
+            "label": "Белгородская область",
+            "children": [
+              {
+                "value": "98697",
+                "label": "Алексеевский район",
+                "children": [
+                  {
+                    "value": "20192",
+                    "label": "Алексеевка",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "4",
+                "label": "Белгород",
+                "children": []
+              },
+              {
+                "value": "10646",
+                "label": "Губкин",
+                "children": []
+              },
+              {
+                "value": "10649",
+                "label": "Старый Оскол",
+                "children": []
+              },
+              {
+                "value": "98716",
+                "label": "Шебекинский район",
+                "children": [
+                  {
+                    "value": "20196",
+                    "label": "Шебекино",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98717",
+                "label": "Яковлевский район",
+                "children": [
+                  {
+                    "value": "20587",
+                    "label": "Строитель",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "10650",
+            "label": "Брянская область",
+            "children": [
+              {
+                "value": "191",
+                "label": "Брянск",
+                "children": []
+              },
+              {
+                "value": "10653",
+                "label": "Клинцы",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10658",
+            "label": "Владимирская область",
+            "children": [
+              {
+                "value": "98745",
+                "label": "Александровский район",
+                "children": [
+                  {
+                    "value": "10656",
+                    "label": "Александров",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "192",
+                "label": "Владимир",
+                "children": []
+              },
+              {
+                "value": "10661",
+                "label": "Гусь-Хрустальный",
+                "children": []
+              },
+              {
+                "value": "98750",
+                "label": "Киржачский район",
+                "children": [
+                  {
+                    "value": "10663",
+                    "label": "Киржач",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10664",
+                "label": "Ковров",
+                "children": []
+              },
+              {
+                "value": "10668",
+                "label": "Муром",
+                "children": []
+              },
+              {
+                "value": "98755",
+                "label": "Петушинский район",
+                "children": [
+                  {
+                    "value": "37129",
+                    "label": "Покров",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "10672",
+            "label": "Воронежская область",
+            "children": [
+              {
+                "value": "193",
+                "label": "Воронеж",
+                "children": []
+              },
+              {
+                "value": "98787",
+                "label": "Россошанский район",
+                "children": [
+                  {
+                    "value": "10681",
+                    "label": "Россошь",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "10687",
+            "label": "Ивановская область",
+            "children": [
+              {
+                "value": "5",
+                "label": "Иваново",
+                "children": []
+              },
+              {
+                "value": "10689",
+                "label": "Кинешма",
+                "children": []
+              },
+              {
+                "value": "10691",
+                "label": "Шуя",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10693",
+            "label": "Калужская область",
+            "children": [
+              {
+                "value": "6",
+                "label": "Калуга",
+                "children": []
+              },
+              {
+                "value": "98826",
+                "label": "Малоярославецкий район",
+                "children": [
+                  {
+                    "value": "10697",
+                    "label": "Малоярославец",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "967",
+                "label": "Обнинск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10699",
+            "label": "Костромская область",
+            "children": [
+              {
+                "value": "7",
+                "label": "Кострома",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10705",
+            "label": "Курская область",
+            "children": [
+              {
+                "value": "10710",
+                "label": "Железногорск",
+                "children": []
+              },
+              {
+                "value": "8",
+                "label": "Курск",
+                "children": []
+              },
+              {
+                "value": "20707",
+                "label": "Курчатов",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10712",
+            "label": "Липецкая область",
+            "children": [
+              {
+                "value": "10713",
+                "label": "Елец",
+                "children": []
+              },
+              {
+                "value": "9",
+                "label": "Липецк",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10772",
+            "label": "Орловская область",
+            "children": [
+              {
+                "value": "10",
+                "label": "Орёл",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10776",
+            "label": "Рязанская область",
+            "children": [
+              {
+                "value": "10773",
+                "label": "Касимов",
+                "children": []
+              },
+              {
+                "value": "11",
+                "label": "Рязань",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10795",
+            "label": "Смоленская область",
+            "children": [
+              {
+                "value": "98958",
+                "label": "Вяземский район",
+                "children": [
+                  {
+                    "value": "10782",
+                    "label": "Вязьма",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98959",
+                "label": "Гагаринский район",
+                "children": [
+                  {
+                    "value": "10783",
+                    "label": "Гагарин",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "12",
+                "label": "Смоленск",
+                "children": []
+              },
+              {
+                "value": "98981",
+                "label": "Ярцевский район",
+                "children": [
+                  {
+                    "value": "10801",
+                    "label": "Ярцево",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "10802",
+            "label": "Тамбовская область",
+            "children": [
+              {
+                "value": "10803",
+                "label": "Мичуринск",
+                "children": []
+              },
+              {
+                "value": "13",
+                "label": "Тамбов",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10819",
+            "label": "Тверская область",
+            "children": [
+              {
+                "value": "99008",
+                "label": "Бологовский район",
+                "children": [
+                  {
+                    "value": "10805",
+                    "label": "Бологое",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10807",
+                "label": "Вышний Волочёк",
+                "children": []
+              },
+              {
+                "value": "10811",
+                "label": "Кимры",
+                "children": []
+              },
+              {
+                "value": "99019",
+                "label": "Конаковский район",
+                "children": [
+                  {
+                    "value": "10812",
+                    "label": "Конаково",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "99028",
+                "label": "Осташковский район",
+                "children": [
+                  {
+                    "value": "10818",
+                    "label": "Осташков",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10820",
+                "label": "Ржев",
+                "children": []
+              },
+              {
+                "value": "14",
+                "label": "Тверь",
+                "children": []
+              },
+              {
+                "value": "99039",
+                "label": "Удомельский район",
+                "children": [
+                  {
+                    "value": "10824",
+                    "label": "Удомля",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "10832",
+            "label": "Тульская область",
+            "children": [
+              {
+                "value": "99044",
+                "label": "Богородицкий район",
+                "children": [
+                  {
+                    "value": "20667",
+                    "label": "Богородицк",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10828",
+                "label": "Ефремов",
+                "children": []
+              },
+              {
+                "value": "10830",
+                "label": "Новомосковск",
+                "children": []
+              },
+              {
+                "value": "15",
+                "label": "Тула",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10841",
+            "label": "Ярославская область",
+            "children": [
+              {
+                "value": "99070",
+                "label": "Мышкинский район",
+                "children": [
+                  {
+                    "value": "10836",
+                    "label": "Мышкин",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10837",
+                "label": "Переславль-Залесский",
+                "children": []
+              },
+              {
+                "value": "10839",
+                "label": "Рыбинск",
+                "children": []
+              },
+              {
+                "value": "99078",
+                "label": "Тутаевский район",
+                "children": [
+                  {
+                    "value": "21154",
+                    "label": "Тутаев",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "99079",
+                "label": "Угличский район",
+                "children": [
+                  {
+                    "value": "10840",
+                    "label": "Углич",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "16",
+                "label": "Ярославль",
+                "children": []
+              }
+            ]
+          }
+        ]
       },
       {
         "value": "17",
-        "label": "Северо-Запад"
+        "label": "Северо-Запад",
+        "children": [
+          {
+            "value": "10174",
+            "label": "Санкт-Петербург и Ленинградская область",
+            "children": [
+              {
+                "value": "98620",
+                "label": "Волховский район",
+                "children": [
+                  {
+                    "value": "10864",
+                    "label": "Волхов",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98621",
+                "label": "Всеволожский район",
+                "children": [
+                  {
+                    "value": "10865",
+                    "label": "Всеволожск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98622",
+                "label": "Выборгский район",
+                "children": [
+                  {
+                    "value": "969",
+                    "label": "Выборг",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98623",
+                "label": "Гатчинский район",
+                "children": [
+                  {
+                    "value": "10867",
+                    "label": "Гатчина",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98624",
+                "label": "Кингисеппский район",
+                "children": [
+                  {
+                    "value": "10870",
+                    "label": "Кингисепп",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98625",
+                "label": "Киришский район",
+                "children": [
+                  {
+                    "value": "10871",
+                    "label": "Кириши",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98626",
+                "label": "Кировский район",
+                "children": [
+                  {
+                    "value": "10872",
+                    "label": "Кировск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98629",
+                "label": "Лужский район",
+                "children": [
+                  {
+                    "value": "10876",
+                    "label": "Луга",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98630",
+                "label": "Подпорожский район",
+                "children": [
+                  {
+                    "value": "22829",
+                    "label": "Вознесенье",
+                    "children": []
+                  },
+                  {
+                    "value": "10881",
+                    "label": "Подпорожье",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98631",
+                "label": "Приозерский район",
+                "children": [
+                  {
+                    "value": "10883",
+                    "label": "Приозерск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "2",
+                "label": "Санкт-Петербург",
+                "children": [
+                  {
+                    "value": "20293",
+                    "label": "Колпинский район",
+                    "children": [
+                      {
+                        "value": "26081",
+                        "label": "Колпино",
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "value": "20297",
+                    "label": "Пушкинский район",
+                    "children": [
+                      {
+                        "value": "10884",
+                        "label": "Пушкин",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "value": "98632",
+                "label": "Сланцевский район",
+                "children": [
+                  {
+                    "value": "10888",
+                    "label": "Сланцы",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10891",
+                "label": "Сосновый Бор",
+                "children": []
+              },
+              {
+                "value": "98633",
+                "label": "Тихвинский район",
+                "children": [
+                  {
+                    "value": "10892",
+                    "label": "Тихвин",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "98634",
+                "label": "Тосненский район",
+                "children": [
+                  {
+                    "value": "10893",
+                    "label": "Тосно",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "10842",
+            "label": "Архангельская область",
+            "children": [
+              {
+                "value": "20",
+                "label": "Архангельск",
+                "children": []
+              },
+              {
+                "value": "10846",
+                "label": "Котлас",
+                "children": []
+              },
+              {
+                "value": "20117",
+                "label": "Новодвинск",
+                "children": []
+              },
+              {
+                "value": "10849",
+                "label": "Северодвинск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10853",
+            "label": "Вологодская область",
+            "children": [
+              {
+                "value": "99105",
+                "label": "Великоустюгский район",
+                "children": [
+                  {
+                    "value": "10854",
+                    "label": "Великий Устюг",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "21",
+                "label": "Вологда",
+                "children": []
+              },
+              {
+                "value": "968",
+                "label": "Череповец",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10857",
+            "label": "Калининградская область",
+            "children": [
+              {
+                "value": "20139",
+                "label": "Зеленоградск",
+                "children": []
+              },
+              {
+                "value": "22",
+                "label": "Калининград",
+                "children": []
+              },
+              {
+                "value": "20144",
+                "label": "Пионерский",
+                "children": []
+              },
+              {
+                "value": "10860",
+                "label": "Советск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10897",
+            "label": "Мурманская область",
+            "children": [
+              {
+                "value": "10894",
+                "label": "Апатиты",
+                "children": []
+              },
+              {
+                "value": "101749",
+                "label": "Кандалакшский район",
+                "children": [
+                  {
+                    "value": "10895",
+                    "label": "Кандалакша",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10896",
+                "label": "Мончегорск",
+                "children": []
+              },
+              {
+                "value": "23",
+                "label": "Мурманск",
+                "children": []
+              },
+              {
+                "value": "20155",
+                "label": "Оленегорск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10904",
+            "label": "Новгородская область",
+            "children": [
+              {
+                "value": "99146",
+                "label": "Боровичский район",
+                "children": [
+                  {
+                    "value": "10906",
+                    "label": "Боровичи",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "99147",
+                "label": "Валдайский район",
+                "children": [
+                  {
+                    "value": "10907",
+                    "label": "Валдай",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "24",
+                "label": "Великий Новгород",
+                "children": []
+              },
+              {
+                "value": "99161",
+                "label": "Старорусский район",
+                "children": [
+                  {
+                    "value": "10923",
+                    "label": "Старая Русса",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "10926",
+            "label": "Псковская область",
+            "children": [
+              {
+                "value": "10928",
+                "label": "Великие Луки",
+                "children": []
+              },
+              {
+                "value": "25",
+                "label": "Псков",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10933",
+            "label": "Республика Карелия",
+            "children": [
+              {
+                "value": "99193",
+                "label": "Кондопожский район",
+                "children": [
+                  {
+                    "value": "10934",
+                    "label": "Кондопога",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10935",
+                "label": "Костомукша",
+                "children": []
+              },
+              {
+                "value": "18",
+                "label": "Петрозаводск",
+                "children": []
+              },
+              {
+                "value": "99203",
+                "label": "Сегежский район",
+                "children": [
+                  {
+                    "value": "10936",
+                    "label": "Сегежа",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "110934",
+                "label": "Сортавальский район",
+                "children": [
+                  {
+                    "value": "10937",
+                    "label": "Сортавала",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "10939",
+            "label": "Республика Коми",
+            "children": [
+              {
+                "value": "10940",
+                "label": "Воркута",
+                "children": []
+              },
+              {
+                "value": "10941",
+                "label": "Инта",
+                "children": []
+              },
+              {
+                "value": "99210",
+                "label": "Район Печора",
+                "children": [
+                  {
+                    "value": "10942",
+                    "label": "Печора",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "19",
+                "label": "Сыктывкар",
+                "children": []
+              },
+              {
+                "value": "10944",
+                "label": "Усинск",
+                "children": []
+              },
+              {
+                "value": "10945",
+                "label": "Ухта",
+                "children": []
+              }
+            ]
+          }
+        ]
       },
       {
         "value": "40",
-        "label": "Поволжье"
+        "label": "Поволжье",
+        "children": [
+          {
+            "value": "11070",
+            "label": "Кировская область",
+            "children": [
+              {
+                "value": "20020",
+                "label": "Вятские Поляны",
+                "children": []
+              },
+              {
+                "value": "46",
+                "label": "Киров",
+                "children": []
+              },
+              {
+                "value": "11071",
+                "label": "Кирово-Чепецк",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11079",
+            "label": "Нижегородская область",
+            "children": [
+              {
+                "value": "11080",
+                "label": "Арзамас",
+                "children": []
+              },
+              {
+                "value": "20040",
+                "label": "Выкса",
+                "children": []
+              },
+              {
+                "value": "972",
+                "label": "Дзержинск (Нижегородская область)",
+                "children": []
+              },
+              {
+                "value": "99555",
+                "label": "Кстовский район",
+                "children": [
+                  {
+                    "value": "20044",
+                    "label": "Кстово",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "47",
+                "label": "Нижний Новгород",
+                "children": []
+              },
+              {
+                "value": "99560",
+                "label": "Павловский район",
+                "children": [
+                  {
+                    "value": "11082",
+                    "label": "Павлово",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "11083",
+                "label": "Саров",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11084",
+            "label": "Оренбургская область",
+            "children": [
+              {
+                "value": "11086",
+                "label": "Бузулук",
+                "children": []
+              },
+              {
+                "value": "11087",
+                "label": "Гай",
+                "children": []
+              },
+              {
+                "value": "11090",
+                "label": "Новотроицк",
+                "children": []
+              },
+              {
+                "value": "48",
+                "label": "Оренбург",
+                "children": []
+              },
+              {
+                "value": "11091",
+                "label": "Орск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11095",
+            "label": "Пензенская область",
+            "children": [
+              {
+                "value": "11101",
+                "label": "Кузнецк",
+                "children": []
+              },
+              {
+                "value": "49",
+                "label": "Пенза",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11108",
+            "label": "Пермский край",
+            "children": [
+              {
+                "value": "20237",
+                "label": "Березники",
+                "children": []
+              },
+              {
+                "value": "20244",
+                "label": "Лысьва",
+                "children": []
+              },
+              {
+                "value": "50",
+                "label": "Пермь",
+                "children": []
+              },
+              {
+                "value": "11110",
+                "label": "Соликамск",
+                "children": []
+              },
+              {
+                "value": "110916",
+                "label": "Чайковский район",
+                "children": [
+                  {
+                    "value": "20243",
+                    "label": "Чайковский",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "11111",
+            "label": "Республика Башкортостан",
+            "children": [
+              {
+                "value": "99675",
+                "label": "Белебеевский район",
+                "children": [
+                  {
+                    "value": "20714",
+                    "label": "Белебей",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "99677",
+                "label": "Белорецкий район",
+                "children": [
+                  {
+                    "value": "20259",
+                    "label": "Белорецк",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "99694",
+                "label": "Ишимбайский район",
+                "children": [
+                  {
+                    "value": "20718",
+                    "label": "Ишимбай",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "11113",
+                "label": "Кумертау",
+                "children": []
+              },
+              {
+                "value": "99703",
+                "label": "Мелеузовский район",
+                "children": [
+                  {
+                    "value": "20715",
+                    "label": "Мелеуз",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "11114",
+                "label": "Нефтекамск",
+                "children": []
+              },
+              {
+                "value": "20235",
+                "label": "Октябрьский",
+                "children": []
+              },
+              {
+                "value": "11115",
+                "label": "Салават",
+                "children": []
+              },
+              {
+                "value": "20716",
+                "label": "Сибай",
+                "children": []
+              },
+              {
+                "value": "11116",
+                "label": "Стерлитамак",
+                "children": []
+              },
+              {
+                "value": "99712",
+                "label": "Туймазинский район",
+                "children": [
+                  {
+                    "value": "20717",
+                    "label": "Туймазы",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "172",
+                "label": "Уфа",
+                "children": []
+              },
+              {
+                "value": "99714",
+                "label": "Учалинский район",
+                "children": [
+                  {
+                    "value": "20680",
+                    "label": "Учалы",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "11077",
+            "label": "Республика Марий Эл",
+            "children": [
+              {
+                "value": "20721",
+                "label": "Волжск",
+                "children": []
+              },
+              {
+                "value": "41",
+                "label": "Йошкар-Ола",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11117",
+            "label": "Республика Мордовия",
+            "children": [
+              {
+                "value": "99737",
+                "label": "Рузаевский район",
+                "children": [
+                  {
+                    "value": "20010",
+                    "label": "Рузаевка",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "42",
+                "label": "Саранск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11119",
+            "label": "Республика Татарстан",
+            "children": [
+              {
+                "value": "11121",
+                "label": "Альметьевск",
+                "children": []
+              },
+              {
+                "value": "11122",
+                "label": "Бугульма",
+                "children": []
+              },
+              {
+                "value": "43",
+                "label": "Казань",
+                "children": []
+              },
+              {
+                "value": "236",
+                "label": "Набережные Челны",
+                "children": []
+              },
+              {
+                "value": "11127",
+                "label": "Нижнекамск",
+                "children": []
+              },
+              {
+                "value": "11129",
+                "label": "Чистополь",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11131",
+            "label": "Самарская область",
+            "children": [
+              {
+                "value": "11132",
+                "label": "Жигулёвск",
+                "children": []
+              },
+              {
+                "value": "11135",
+                "label": "Новокуйбышевск",
+                "children": []
+              },
+              {
+                "value": "51",
+                "label": "Самара",
+                "children": []
+              },
+              {
+                "value": "11139",
+                "label": "Сызрань",
+                "children": []
+              },
+              {
+                "value": "240",
+                "label": "Тольятти",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11146",
+            "label": "Саратовская область",
+            "children": [
+              {
+                "value": "99817",
+                "label": "Балаковский район",
+                "children": [
+                  {
+                    "value": "11143",
+                    "label": "Балаково",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "99818",
+                "label": "Балашовский район",
+                "children": [
+                  {
+                    "value": "11144",
+                    "label": "Балашов",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "99832",
+                "label": "Марксовский район",
+                "children": [
+                  {
+                    "value": "20063",
+                    "label": "Маркс",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "194",
+                "label": "Саратов",
+                "children": []
+              },
+              {
+                "value": "99850",
+                "label": "Энгельсский район",
+                "children": [
+                  {
+                    "value": "11147",
+                    "label": "Энгельс",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "11148",
+            "label": "Удмуртская Республика",
+            "children": [
+              {
+                "value": "11149",
+                "label": "Воткинск",
+                "children": []
+              },
+              {
+                "value": "11150",
+                "label": "Глазов",
+                "children": []
+              },
+              {
+                "value": "44",
+                "label": "Ижевск",
+                "children": []
+              },
+              {
+                "value": "11152",
+                "label": "Сарапул",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11153",
+            "label": "Ульяновская область",
+            "children": [
+              {
+                "value": "11155",
+                "label": "Димитровград",
+                "children": []
+              },
+              {
+                "value": "20070",
+                "label": "Новоульяновск",
+                "children": []
+              },
+              {
+                "value": "195",
+                "label": "Ульяновск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11156",
+            "label": "Чувашская Республика",
+            "children": [
+              {
+                "value": "37133",
+                "label": "Новочебоксарск",
+                "children": []
+              },
+              {
+                "value": "45",
+                "label": "Чебоксары",
+                "children": []
+              },
+              {
+                "value": "20078",
+                "label": "Шумерля",
+                "children": []
+              }
+            ]
+          }
+        ]
       },
       {
         "value": "26",
-        "label": "Юг"
+        "label": "Юг",
+        "children": [
+          {
+            "value": "10946",
+            "label": "Астраханская область",
+            "children": [
+              {
+                "value": "37",
+                "label": "Астрахань",
+                "children": []
+              },
+              {
+                "value": "99221",
+                "label": "Ахтубинский район",
+                "children": [
+                  {
+                    "value": "20167",
+                    "label": "Ахтубинск",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "10950",
+            "label": "Волгоградская область",
+            "children": [
+              {
+                "value": "38",
+                "label": "Волгоград",
+                "children": []
+              },
+              {
+                "value": "10951",
+                "label": "Волжский",
+                "children": []
+              },
+              {
+                "value": "10959",
+                "label": "Камышин",
+                "children": []
+              },
+              {
+                "value": "10965",
+                "label": "Михайловка",
+                "children": []
+              },
+              {
+                "value": "10981",
+                "label": "Урюпинск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10995",
+            "label": "Краснодарский край",
+            "children": [
+              {
+                "value": "1107",
+                "label": "Анапа",
+                "children": []
+              },
+              {
+                "value": "10987",
+                "label": "Армавир",
+                "children": []
+              },
+              {
+                "value": "99269",
+                "label": "Белореченский район",
+                "children": [
+                  {
+                    "value": "10988",
+                    "label": "Белореченск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10990",
+                "label": "Геленджик",
+                "children": []
+              },
+              {
+                "value": "99274",
+                "label": "Ейский район",
+                "children": [
+                  {
+                    "value": "10993",
+                    "label": "Ейск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "99275",
+                "label": "Кавказский район",
+                "children": [
+                  {
+                    "value": "10996",
+                    "label": "Кропоткин",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "35",
+                "label": "Краснодар",
+                "children": []
+              },
+              {
+                "value": "99281",
+                "label": "Крымский район",
+                "children": [
+                  {
+                    "value": "10997",
+                    "label": "Крымск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "970",
+                "label": "Новороссийск",
+                "children": []
+              },
+              {
+                "value": "99293",
+                "label": "Славянский район",
+                "children": [
+                  {
+                    "value": "20704",
+                    "label": "Славянск-на-Кубани",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "239",
+                "label": "Сочи",
+                "children": []
+              },
+              {
+                "value": "99297",
+                "label": "Тимашевский район",
+                "children": [
+                  {
+                    "value": "21141",
+                    "label": "Тимашевск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "99298",
+                "label": "Тихорецкий район",
+                "children": [
+                  {
+                    "value": "11002",
+                    "label": "Тихорецк",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "99299",
+                "label": "Туапсинский район",
+                "children": [
+                  {
+                    "value": "1058",
+                    "label": "Туапсе",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "11004",
+            "label": "Республика Адыгея",
+            "children": [
+              {
+                "value": "1093",
+                "label": "Майкоп",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11015",
+            "label": "Республика Калмыкия",
+            "children": [
+              {
+                "value": "1094",
+                "label": "Элиста",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11029",
+            "label": "Ростовская область",
+            "children": [
+              {
+                "value": "11030",
+                "label": "Азов",
+                "children": []
+              },
+              {
+                "value": "11033",
+                "label": "Батайск",
+                "children": []
+              },
+              {
+                "value": "99411",
+                "label": "Белокалитвинский район",
+                "children": [
+                  {
+                    "value": "11034",
+                    "label": "Белая Калитва",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "11036",
+                "label": "Волгодонск",
+                "children": []
+              },
+              {
+                "value": "11037",
+                "label": "Гуково",
+                "children": []
+              },
+              {
+                "value": "11043",
+                "label": "Каменск-Шахтинский",
+                "children": []
+              },
+              {
+                "value": "238",
+                "label": "Новочеркасск",
+                "children": []
+              },
+              {
+                "value": "11049",
+                "label": "Новошахтинск",
+                "children": []
+              },
+              {
+                "value": "39",
+                "label": "Ростов-на-Дону",
+                "children": []
+              },
+              {
+                "value": "971",
+                "label": "Таганрог",
+                "children": []
+              },
+              {
+                "value": "11053",
+                "label": "Шахты",
+                "children": []
+              }
+            ]
+          }
+        ]
       },
       {
         "value": "59",
-        "label": "Сибирь"
+        "label": "Сибирь",
+        "children": [
+          {
+            "value": "11235",
+            "label": "Алтайский край",
+            "children": [
+              {
+                "value": "197",
+                "label": "Барнаул",
+                "children": []
+              },
+              {
+                "value": "975",
+                "label": "Бийск",
+                "children": []
+              },
+              {
+                "value": "11240",
+                "label": "Заринск",
+                "children": []
+              },
+              {
+                "value": "11246",
+                "label": "Новоалтайск",
+                "children": []
+              },
+              {
+                "value": "11251",
+                "label": "Рубцовск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11266",
+            "label": "Иркутская область",
+            "children": [
+              {
+                "value": "11256",
+                "label": "Ангарск",
+                "children": []
+              },
+              {
+                "value": "976",
+                "label": "Братск",
+                "children": []
+              },
+              {
+                "value": "63",
+                "label": "Иркутск",
+                "children": []
+              },
+              {
+                "value": "100109",
+                "label": "Нижнеудинский район",
+                "children": [
+                  {
+                    "value": "11268",
+                    "label": "Нижнеудинск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "100112",
+                "label": "Тайшетский район",
+                "children": [
+                  {
+                    "value": "11270",
+                    "label": "Тайшет",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "11271",
+                "label": "Тулун",
+                "children": []
+              },
+              {
+                "value": "11272",
+                "label": "Усолье-Сибирское",
+                "children": []
+              },
+              {
+                "value": "11273",
+                "label": "Усть-Илимск",
+                "children": []
+              },
+              {
+                "value": "100116",
+                "label": "Усть-Кутский район",
+                "children": [
+                  {
+                    "value": "20097",
+                    "label": "Усть-Кут",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "11274",
+                "label": "Черемхово",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11282",
+            "label": "Кемеровская область (Кузбасс)",
+            "children": [
+              {
+                "value": "11276",
+                "label": "Анжеро-Судженск",
+                "children": []
+              },
+              {
+                "value": "11277",
+                "label": "Белово",
+                "children": []
+              },
+              {
+                "value": "11278",
+                "label": "Берёзовский (Кемеровская область)",
+                "children": []
+              },
+              {
+                "value": "64",
+                "label": "Кемерово",
+                "children": []
+              },
+              {
+                "value": "11283",
+                "label": "Киселёвск",
+                "children": []
+              },
+              {
+                "value": "11285",
+                "label": "Ленинск-Кузнецкий",
+                "children": []
+              },
+              {
+                "value": "11287",
+                "label": "Междуреченск",
+                "children": []
+              },
+              {
+                "value": "11288",
+                "label": "Мыски",
+                "children": []
+              },
+              {
+                "value": "237",
+                "label": "Новокузнецк",
+                "children": []
+              },
+              {
+                "value": "11292",
+                "label": "Полысаево",
+                "children": []
+              },
+              {
+                "value": "11291",
+                "label": "Прокопьевск",
+                "children": []
+              },
+              {
+                "value": "11299",
+                "label": "Юрга",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11309",
+            "label": "Красноярский край",
+            "children": [
+              {
+                "value": "11302",
+                "label": "Ачинск",
+                "children": []
+              },
+              {
+                "value": "11304",
+                "label": "Енисейск",
+                "children": []
+              },
+              {
+                "value": "20086",
+                "label": "Железногорск",
+                "children": []
+              },
+              {
+                "value": "20088",
+                "label": "Зеленогорск",
+                "children": []
+              },
+              {
+                "value": "62",
+                "label": "Красноярск",
+                "children": []
+              },
+              {
+                "value": "11310",
+                "label": "Минусинск",
+                "children": []
+              },
+              {
+                "value": "11311",
+                "label": "Норильск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11316",
+            "label": "Новосибирская область",
+            "children": [
+              {
+                "value": "100183",
+                "label": "Барабинский район",
+                "children": [
+                  {
+                    "value": "20098",
+                    "label": "Барабинск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "11314",
+                "label": "Бердск",
+                "children": []
+              },
+              {
+                "value": "20100",
+                "label": "Искитим",
+                "children": []
+              },
+              {
+                "value": "100189",
+                "label": "Карасукский район",
+                "children": [
+                  {
+                    "value": "20101",
+                    "label": "Карасук",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "65",
+                "label": "Новосибирск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11318",
+            "label": "Омская область",
+            "children": [
+              {
+                "value": "66",
+                "label": "Омск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10231",
+            "label": "Республика Алтай",
+            "children": [
+              {
+                "value": "11319",
+                "label": "Горно-Алтайск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10233",
+            "label": "Республика Тыва",
+            "children": [
+              {
+                "value": "11333",
+                "label": "Кызыл",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11340",
+            "label": "Республика Хакасия",
+            "children": [
+              {
+                "value": "1095",
+                "label": "Абакан",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11353",
+            "label": "Томская область",
+            "children": [
+              {
+                "value": "100278",
+                "label": "Каргасокский район",
+                "children": [
+                  {
+                    "value": "21675",
+                    "label": "Каргасок",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "100280",
+                "label": "Колпашевский район",
+                "children": [
+                  {
+                    "value": "11349",
+                    "label": "Колпашево",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "11351",
+                "label": "Северск",
+                "children": []
+              },
+              {
+                "value": "11352",
+                "label": "Стрежевой",
+                "children": []
+              },
+              {
+                "value": "67",
+                "label": "Томск",
+                "children": []
+              }
+            ]
+          }
+        ]
       },
       {
         "value": "73",
-        "label": "Дальний Восток"
+        "label": "Дальний Восток",
+        "children": [
+          {
+            "value": "11375",
+            "label": "Амурская область",
+            "children": [
+              {
+                "value": "11374",
+                "label": "Белогорск",
+                "children": []
+              },
+              {
+                "value": "77",
+                "label": "Благовещенск",
+                "children": []
+              },
+              {
+                "value": "11387",
+                "label": "Свободный",
+                "children": []
+              },
+              {
+                "value": "11391",
+                "label": "Тында",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "10243",
+            "label": "Еврейская автономная область",
+            "children": [
+              {
+                "value": "11393",
+                "label": "Биробиджан",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "21949",
+            "label": "Забайкальский край",
+            "children": [
+              {
+                "value": "68",
+                "label": "Чита",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11398",
+            "label": "Камчатский край",
+            "children": [
+              {
+                "value": "78",
+                "label": "Петропавловск-Камчатский",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11403",
+            "label": "Магаданская область",
+            "children": [
+              {
+                "value": "79",
+                "label": "Магадан",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11409",
+            "label": "Приморский край",
+            "children": [
+              {
+                "value": "11405",
+                "label": "Арсеньев",
+                "children": []
+              },
+              {
+                "value": "11406",
+                "label": "Артём",
+                "children": []
+              },
+              {
+                "value": "75",
+                "label": "Владивосток",
+                "children": []
+              },
+              {
+                "value": "11411",
+                "label": "Дальнегорск",
+                "children": []
+              },
+              {
+                "value": "974",
+                "label": "Находка",
+                "children": []
+              },
+              {
+                "value": "11425",
+                "label": "Спасск-Дальний",
+                "children": []
+              },
+              {
+                "value": "11426",
+                "label": "Уссурийск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11330",
+            "label": "Республика Бурятия",
+            "children": [
+              {
+                "value": "100244",
+                "label": "Баргузинский район",
+                "children": [
+                  {
+                    "value": "21161",
+                    "label": "Усть-Баргузин",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "11327",
+                "label": "Северобайкальск",
+                "children": []
+              },
+              {
+                "value": "198",
+                "label": "Улан-Удэ",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11443",
+            "label": "Республика Саха (Якутия)",
+            "children": [
+              {
+                "value": "101987",
+                "label": "Нерюнгринский район",
+                "children": [
+                  {
+                    "value": "11437",
+                    "label": "Нерюнгри",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "74",
+                "label": "Якутск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11450",
+            "label": "Сахалинская область",
+            "children": [
+              {
+                "value": "20160",
+                "label": "Невельск",
+                "children": []
+              },
+              {
+                "value": "80",
+                "label": "Южно-Сахалинск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11457",
+            "label": "Хабаровский край",
+            "children": [
+              {
+                "value": "100398",
+                "label": "Амурский район",
+                "children": [
+                  {
+                    "value": "11451",
+                    "label": "Амурск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "11453",
+                "label": "Комсомольск-на-Амуре",
+                "children": []
+              },
+              {
+                "value": "76",
+                "label": "Хабаровск",
+                "children": []
+              }
+            ]
+          }
+        ]
       },
       {
         "value": "977",
-        "label": "Республика Крым"
+        "label": "Республика Крым",
+        "children": [
+          {
+            "value": "11471",
+            "label": "Алушта",
+            "children": []
+          },
+          {
+            "value": "28892",
+            "label": "Армянск",
+            "children": []
+          },
+          {
+            "value": "24696",
+            "label": "Бахчисарайский район",
+            "children": [
+              {
+                "value": "27217",
+                "label": "Бахчисарай",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "27555",
+            "label": "Джанкой",
+            "children": []
+          },
+          {
+            "value": "11463",
+            "label": "Евпатория",
+            "children": []
+          },
+          {
+            "value": "11464",
+            "label": "Керчь",
+            "children": []
+          },
+          {
+            "value": "27693",
+            "label": "Красноперекопск",
+            "children": []
+          },
+          {
+            "value": "24702",
+            "label": "Ленинский район",
+            "children": [
+              {
+                "value": "28786",
+                "label": "Щёлкино",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "20556",
+            "label": "Саки",
+            "children": []
+          },
+          {
+            "value": "959",
+            "label": "Севастополь",
+            "children": []
+          },
+          {
+            "value": "146",
+            "label": "Симферополь",
+            "children": []
+          },
+          {
+            "value": "11472",
+            "label": "Судак",
+            "children": []
+          },
+          {
+            "value": "11469",
+            "label": "Феодосия",
+            "children": []
+          },
+          {
+            "value": "11470",
+            "label": "Ялта",
+            "children": []
+          }
+        ]
       },
       {
         "value": "102444",
-        "label": "Северный Кавказ"
+        "label": "Северный Кавказ",
+        "children": [
+          {
+            "value": "11013",
+            "label": "Кабардино-Балкарская Республика",
+            "children": [
+              {
+                "value": "30",
+                "label": "Нальчик",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11020",
+            "label": "Карачаево-Черкесская Республика",
+            "children": [
+              {
+                "value": "1104",
+                "label": "Черкесск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11010",
+            "label": "Республика Дагестан",
+            "children": [
+              {
+                "value": "11006",
+                "label": "Буйнакск",
+                "children": []
+              },
+              {
+                "value": "11007",
+                "label": "Дербент",
+                "children": []
+              },
+              {
+                "value": "21521",
+                "label": "Избербаш",
+                "children": []
+              },
+              {
+                "value": "11008",
+                "label": "Каспийск",
+                "children": []
+              },
+              {
+                "value": "11009",
+                "label": "Кизляр",
+                "children": []
+              },
+              {
+                "value": "28",
+                "label": "Махачкала",
+                "children": []
+              },
+              {
+                "value": "11011",
+                "label": "Хасавюрт",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11012",
+            "label": "Республика Ингушетия",
+            "children": [
+              {
+                "value": "20181",
+                "label": "Магас",
+                "children": []
+              },
+              {
+                "value": "1092",
+                "label": "Назрань",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11021",
+            "label": "Республика Северная Осетия — Алания",
+            "children": [
+              {
+                "value": "33",
+                "label": "Владикавказ",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11069",
+            "label": "Ставропольский край",
+            "children": [
+              {
+                "value": "99456",
+                "label": "Будённовский район",
+                "children": [
+                  {
+                    "value": "11055",
+                    "label": "Будённовск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "11056",
+                "label": "Георгиевск",
+                "children": []
+              },
+              {
+                "value": "11057",
+                "label": "Ессентуки",
+                "children": []
+              },
+              {
+                "value": "11062",
+                "label": "Кисловодск",
+                "children": []
+              },
+              {
+                "value": "11063",
+                "label": "Минеральные Воды",
+                "children": []
+              },
+              {
+                "value": "11064",
+                "label": "Невинномысск",
+                "children": []
+              },
+              {
+                "value": "11067",
+                "label": "Пятигорск",
+                "children": []
+              },
+              {
+                "value": "36",
+                "label": "Ставрополь",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11024",
+            "label": "Чеченская Республика",
+            "children": [
+              {
+                "value": "1106",
+                "label": "Грозный",
+                "children": []
+              }
+            ]
+          }
+        ]
       },
       {
         "value": "52",
-        "label": "Урал"
+        "label": "Урал",
+        "children": [
+          {
+            "value": "11158",
+            "label": "Курганская область",
+            "children": [
+              {
+                "value": "53",
+                "label": "Курган",
+                "children": []
+              },
+              {
+                "value": "11159",
+                "label": "Шадринск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11162",
+            "label": "Свердловская область",
+            "children": [
+              {
+                "value": "11160",
+                "label": "Асбест",
+                "children": []
+              },
+              {
+                "value": "20579",
+                "label": "Белоярский",
+                "children": []
+              },
+              {
+                "value": "29397",
+                "label": "Берёзовский (Свердловская область)",
+                "children": []
+              },
+              {
+                "value": "20720",
+                "label": "Верхняя Пышма",
+                "children": []
+              },
+              {
+                "value": "11161",
+                "label": "Верхняя Салда",
+                "children": []
+              },
+              {
+                "value": "54",
+                "label": "Екатеринбург",
+                "children": []
+              },
+              {
+                "value": "11164",
+                "label": "Каменск-Уральский",
+                "children": []
+              },
+              {
+                "value": "20234",
+                "label": "Качканар",
+                "children": []
+              },
+              {
+                "value": "11165",
+                "label": "Краснотурьинск",
+                "children": []
+              },
+              {
+                "value": "20691",
+                "label": "Красноуфимск",
+                "children": []
+              },
+              {
+                "value": "11166",
+                "label": "Кушва",
+                "children": []
+              },
+              {
+                "value": "11167",
+                "label": "Лесной",
+                "children": []
+              },
+              {
+                "value": "20654",
+                "label": "Невьянск",
+                "children": []
+              },
+              {
+                "value": "11168",
+                "label": "Нижний Тагил",
+                "children": []
+              },
+              {
+                "value": "11169",
+                "label": "Нижняя Тура",
+                "children": []
+              },
+              {
+                "value": "11170",
+                "label": "Новоуральск",
+                "children": []
+              },
+              {
+                "value": "11171",
+                "label": "Первоуральск",
+                "children": []
+              },
+              {
+                "value": "21726",
+                "label": "Полевской",
+                "children": []
+              },
+              {
+                "value": "20224",
+                "label": "Ревда",
+                "children": []
+              },
+              {
+                "value": "20684",
+                "label": "Реж",
+                "children": []
+              },
+              {
+                "value": "20672",
+                "label": "Североуральск",
+                "children": []
+              },
+              {
+                "value": "11172",
+                "label": "Серов",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11176",
+            "label": "Тюменская область",
+            "children": [
+              {
+                "value": "11173",
+                "label": "Ишим",
+                "children": []
+              },
+              {
+                "value": "11175",
+                "label": "Тобольск",
+                "children": []
+              },
+              {
+                "value": "55",
+                "label": "Тюмень",
+                "children": []
+              },
+              {
+                "value": "11178",
+                "label": "Ялуторовск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11193",
+            "label": "Ханты-Мансийский автономный округ - Югра",
+            "children": [
+              {
+                "value": "11180",
+                "label": "Когалым",
+                "children": []
+              },
+              {
+                "value": "11181",
+                "label": "Лангепас",
+                "children": []
+              },
+              {
+                "value": "11182",
+                "label": "Мегион",
+                "children": []
+              },
+              {
+                "value": "11184",
+                "label": "Нефтеюганск",
+                "children": []
+              },
+              {
+                "value": "1091",
+                "label": "Нижневартовск",
+                "children": []
+              },
+              {
+                "value": "11186",
+                "label": "Нягань",
+                "children": []
+              },
+              {
+                "value": "11188",
+                "label": "Пыть-Ях",
+                "children": []
+              },
+              {
+                "value": "11189",
+                "label": "Радужный",
+                "children": []
+              },
+              {
+                "value": "973",
+                "label": "Сургут",
+                "children": []
+              },
+              {
+                "value": "11192",
+                "label": "Урай",
+                "children": []
+              },
+              {
+                "value": "57",
+                "label": "Ханты-Мансийск",
+                "children": []
+              },
+              {
+                "value": "11177",
+                "label": "Югорск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11225",
+            "label": "Челябинская область",
+            "children": [
+              {
+                "value": "100005",
+                "label": "Ашинский район",
+                "children": [
+                  {
+                    "value": "11196",
+                    "label": "Аша",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "11200",
+                "label": "Верхний Уфалей",
+                "children": []
+              },
+              {
+                "value": "11202",
+                "label": "Златоуст",
+                "children": []
+              },
+              {
+                "value": "11207",
+                "label": "Копейск",
+                "children": []
+              },
+              {
+                "value": "235",
+                "label": "Магнитогорск",
+                "children": []
+              },
+              {
+                "value": "11212",
+                "label": "Миасс",
+                "children": []
+              },
+              {
+                "value": "11214",
+                "label": "Озёрск",
+                "children": []
+              },
+              {
+                "value": "100020",
+                "label": "Саткинский район",
+                "children": [
+                  {
+                    "value": "11217",
+                    "label": "Сатка",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "11218",
+                "label": "Снежинск",
+                "children": []
+              },
+              {
+                "value": "11220",
+                "label": "Троицк",
+                "children": []
+              },
+              {
+                "value": "11223",
+                "label": "Усть-Катав",
+                "children": []
+              },
+              {
+                "value": "11224",
+                "label": "Чебаркуль",
+                "children": []
+              },
+              {
+                "value": "56",
+                "label": "Челябинск",
+                "children": []
+              },
+              {
+                "value": "11227",
+                "label": "Южноуральск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "11232",
+            "label": "Ямало-Ненецкий автономный округ",
+            "children": [
+              {
+                "value": "11228",
+                "label": "Губкинский",
+                "children": []
+              },
+              {
+                "value": "100028",
+                "label": "Надымский район",
+                "children": [
+                  {
+                    "value": "11229",
+                    "label": "Надым",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "11230",
+                "label": "Новый Уренгой",
+                "children": []
+              },
+              {
+                "value": "11231",
+                "label": "Ноябрьск",
+                "children": []
+              },
+              {
+                "value": "58",
+                "label": "Салехард",
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "value": "166",
+    "label": "СНГ (исключая Россию)",
+    "children": [
+      {
+        "value": "29386",
+        "label": "Абхазия",
+        "children": []
+      },
+      {
+        "value": "167",
+        "label": "Азербайджан",
+        "children": [
+          {
+            "value": "10253",
+            "label": "Баку",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "168",
+        "label": "Армения",
+        "children": [
+          {
+            "value": "10262",
+            "label": "Ереван",
+            "children": []
+          },
+          {
+            "value": "105789",
+            "label": "Область Арагацотн",
+            "children": []
+          },
+          {
+            "value": "105790",
+            "label": "Область Арарат",
+            "children": []
+          },
+          {
+            "value": "105791",
+            "label": "Область Армавир",
+            "children": []
+          },
+          {
+            "value": "105798",
+            "label": "Область Вайоц-Дзор",
+            "children": []
+          },
+          {
+            "value": "105792",
+            "label": "Область Гехаркуник",
+            "children": []
+          },
+          {
+            "value": "105793",
+            "label": "Область Котайк",
+            "children": []
+          },
+          {
+            "value": "105796",
+            "label": "Область Сюник",
+            "children": []
+          },
+          {
+            "value": "105795",
+            "label": "Область Ширак",
+            "children": [
+              {
+                "value": "10259",
+                "label": "Гюмри",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "149",
+        "label": "Беларусь",
+        "children": [
+          {
+            "value": "29632",
+            "label": "Брест и область",
+            "children": [
+              {
+                "value": "21015",
+                "label": "Барановичи",
+                "children": []
+              },
+              {
+                "value": "153",
+                "label": "Брест",
+                "children": []
+              },
+              {
+                "value": "102089",
+                "label": "Кобринский район",
+                "children": [
+                  {
+                    "value": "26010",
+                    "label": "Кобрин",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "21510",
+                "label": "Пинск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "29633",
+            "label": "Витебск и область",
+            "children": [
+              {
+                "value": "102178",
+                "label": "Верхнедвинский район",
+                "children": [
+                  {
+                    "value": "26554",
+                    "label": "Верхнедвинск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "154",
+                "label": "Витебск",
+                "children": []
+              },
+              {
+                "value": "102180",
+                "label": "Глубокский район",
+                "children": [
+                  {
+                    "value": "26025",
+                    "label": "Глубокое",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102186",
+                "label": "Миорский район",
+                "children": [
+                  {
+                    "value": "21271",
+                    "label": "Миоры",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "26030",
+                "label": "Новополоцк",
+                "children": []
+              },
+              {
+                "value": "102187",
+                "label": "Оршанский район",
+                "children": [
+                  {
+                    "value": "10276",
+                    "label": "Орша",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102188",
+                "label": "Полоцкий район",
+                "children": [
+                  {
+                    "value": "10275",
+                    "label": "Полоцк",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102189",
+                "label": "Поставский район",
+                "children": [
+                  {
+                    "value": "26026",
+                    "label": "Поставы",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "29631",
+            "label": "Гомель и область",
+            "children": [
+              {
+                "value": "155",
+                "label": "Гомель",
+                "children": []
+              },
+              {
+                "value": "102103",
+                "label": "Жлобинский район",
+                "children": [
+                  {
+                    "value": "26966",
+                    "label": "Жлобин",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102104",
+                "label": "Калинковичский район",
+                "children": [
+                  {
+                    "value": "102235",
+                    "label": "Калинковичи",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102108",
+                "label": "Мозырский район",
+                "children": [
+                  {
+                    "value": "21274",
+                    "label": "Мозырь",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102112",
+                "label": "Речицкий район",
+                "children": [
+                  {
+                    "value": "26008",
+                    "label": "Речица",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102113",
+                "label": "Рогачёвский район",
+                "children": [
+                  {
+                    "value": "26027",
+                    "label": "Рогачёв",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102114",
+                "label": "Светлогорский район",
+                "children": [
+                  {
+                    "value": "26004",
+                    "label": "Светлогорск",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "29634",
+            "label": "Гродно и область",
+            "children": [
+              {
+                "value": "102118",
+                "label": "Волковысский район",
+                "children": [
+                  {
+                    "value": "26923",
+                    "label": "Волковыск",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10274",
+                "label": "Гродно",
+                "children": []
+              },
+              {
+                "value": "102125",
+                "label": "Лидский район",
+                "children": [
+                  {
+                    "value": "21144",
+                    "label": "Лида",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102126",
+                "label": "Мостовский район",
+                "children": [
+                  {
+                    "value": "26007",
+                    "label": "Мосты",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102127",
+                "label": "Новогрудский район",
+                "children": [
+                  {
+                    "value": "26836",
+                    "label": "Новогрудок",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102131",
+                "label": "Слонимский район",
+                "children": [
+                  {
+                    "value": "26005",
+                    "label": "Слоним",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102132",
+                "label": "Сморгонский район",
+                "children": [
+                  {
+                    "value": "26017",
+                    "label": "Сморгонь",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "29630",
+            "label": "Минск и область",
+            "children": [
+              {
+                "value": "102156",
+                "label": "Борисовский район",
+                "children": [
+                  {
+                    "value": "21193",
+                    "label": "Борисов",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102157",
+                "label": "Вилейский район",
+                "children": [
+                  {
+                    "value": "26745",
+                    "label": "Вилейка",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102159",
+                "label": "Дзержинский район",
+                "children": [
+                  {
+                    "value": "26018",
+                    "label": "Дзержинск (Минская область)",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "26034",
+                "label": "Жодино",
+                "children": []
+              },
+              {
+                "value": "102162",
+                "label": "Крупский район",
+                "children": [
+                  {
+                    "value": "26022",
+                    "label": "Крупки",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "157",
+                "label": "Минск",
+                "children": []
+              },
+              {
+                "value": "102165",
+                "label": "Молодечненский район",
+                "children": [
+                  {
+                    "value": "26001",
+                    "label": "Молодечно",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102169",
+                "label": "Слуцкий район",
+                "children": [
+                  {
+                    "value": "26951",
+                    "label": "Слуцк",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102170",
+                "label": "Солигорский район",
+                "children": [
+                  {
+                    "value": "26003",
+                    "label": "Солигорск",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "29629",
+            "label": "Могилёв и область",
+            "children": [
+              {
+                "value": "20729",
+                "label": "Бобруйск",
+                "children": []
+              },
+              {
+                "value": "102136",
+                "label": "Быховский район",
+                "children": [
+                  {
+                    "value": "26021",
+                    "label": "Быхов",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102138",
+                "label": "Горецкий район",
+                "children": [
+                  {
+                    "value": "26774",
+                    "label": "Горки",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102141",
+                "label": "Климовичский район",
+                "children": [
+                  {
+                    "value": "26006",
+                    "label": "Климовичи",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102144",
+                "label": "Кричевский район",
+                "children": [
+                  {
+                    "value": "26015",
+                    "label": "Кричев",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "158",
+                "label": "Могилёв",
+                "children": []
+              },
+              {
+                "value": "102149",
+                "label": "Осиповичский район",
+                "children": [
+                  {
+                    "value": "26012",
+                    "label": "Осиповичи",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "102154",
+                "label": "Шкловский район",
+                "children": [
+                  {
+                    "value": "26016",
+                    "label": "Шклов",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "159",
+        "label": "Казахстан",
+        "children": [
+          {
+            "value": "29403",
+            "label": "Акмолинская область",
+            "children": [
+              {
+                "value": "163",
+                "label": "Астана",
+                "children": []
+              },
+              {
+                "value": "20809",
+                "label": "Кокшетау",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "29414",
+            "label": "Актау и Мангистауская область",
+            "children": [
+              {
+                "value": "29575",
+                "label": "Актау",
+                "children": []
+              },
+              {
+                "value": "29577",
+                "label": "Жанаозен",
+                "children": []
+              },
+              {
+                "value": "116954",
+                "label": "Мунайлинский район",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "29406",
+            "label": "Алматы и область",
+            "children": [
+              {
+                "value": "162",
+                "label": "Алматы",
+                "children": []
+              },
+              {
+                "value": "116782",
+                "label": "Енбекшиказахский район",
+                "children": []
+              },
+              {
+                "value": "116778",
+                "label": "Жамбылский район",
+                "children": []
+              },
+              {
+                "value": "116779",
+                "label": "Илийский район",
+                "children": []
+              },
+              {
+                "value": "116780",
+                "label": "Карасайский район",
+                "children": []
+              },
+              {
+                "value": "116781",
+                "label": "Талгарский район",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "29407",
+            "label": "Атырау и область",
+            "children": [
+              {
+                "value": "10291",
+                "label": "Атырау",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "29408",
+            "label": "Восточно-Казахстанская область",
+            "children": [
+              {
+                "value": "10306",
+                "label": "Усть-Каменогорск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "29411",
+            "label": "Караганда и область",
+            "children": [
+              {
+                "value": "164",
+                "label": "Караганда",
+                "children": []
+              },
+              {
+                "value": "35393",
+                "label": "Темиртау",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "29412",
+            "label": "Костанай и область",
+            "children": [
+              {
+                "value": "10295",
+                "label": "Костанай",
+                "children": []
+              },
+              {
+                "value": "10300",
+                "label": "Рудный",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "29413",
+            "label": "Кызылорда и область",
+            "children": [
+              {
+                "value": "21050",
+                "label": "Кызылорда",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "218938",
+            "label": "Область Абай",
+            "children": [
+              {
+                "value": "165",
+                "label": "Семей",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "218918",
+            "label": "Область Жетысу",
+            "children": [
+              {
+                "value": "116777",
+                "label": "Панфиловский район",
+                "children": []
+              },
+              {
+                "value": "10303",
+                "label": "Талдыкорган",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "218936",
+            "label": "Область Улытау",
+            "children": [
+              {
+                "value": "10308",
+                "label": "Жезказган",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "29415",
+            "label": "Павлодар и область",
+            "children": [
+              {
+                "value": "190",
+                "label": "Павлодар",
+                "children": []
+              },
+              {
+                "value": "29590",
+                "label": "Экибастуз",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "29416",
+            "label": "Северо-Казахстанская область",
+            "children": [
+              {
+                "value": "10298",
+                "label": "Петропавловск",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "29409",
+            "label": "Тараз и Жамбылская область",
+            "children": [
+              {
+                "value": "116960",
+                "label": "Кордайский район",
+                "children": []
+              },
+              {
+                "value": "21094",
+                "label": "Тараз",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "29417",
+            "label": "Туркестан и область",
+            "children": [
+              {
+                "value": "116939",
+                "label": "Казыгуртский район",
+                "children": []
+              },
+              {
+                "value": "116940",
+                "label": "Мактааральский район",
+                "children": []
+              },
+              {
+                "value": "116941",
+                "label": "Ордабасинский район",
+                "children": []
+              },
+              {
+                "value": "116943",
+                "label": "Сайрамский район",
+                "children": []
+              },
+              {
+                "value": "116944",
+                "label": "Сарыагашский район",
+                "children": []
+              },
+              {
+                "value": "116946",
+                "label": "Толебийский район",
+                "children": []
+              },
+              {
+                "value": "21106",
+                "label": "Туркестан",
+                "children": []
+              },
+              {
+                "value": "116947",
+                "label": "Тюлькубасский район",
+                "children": []
+              },
+              {
+                "value": "116948",
+                "label": "Шардаринский район",
+                "children": []
+              },
+              {
+                "value": "221",
+                "label": "Шымкент",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "207",
+        "label": "Кыргызстан",
+        "children": [
+          {
+            "value": "10309",
+            "label": "Бишкек",
+            "children": []
+          },
+          {
+            "value": "10310",
+            "label": "Ош",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "208",
+        "label": "Молдова",
+        "children": [
+          {
+            "value": "10313",
+            "label": "Кишинев",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "209",
+        "label": "Таджикистан",
+        "children": [
+          {
+            "value": "10318",
+            "label": "Душанбе",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "170",
+        "label": "Туркменистан",
+        "children": [
+          {
+            "value": "10324",
+            "label": "Ашхабад",
+            "children": []
+          },
+          {
+            "value": "105950",
+            "label": "Балканский велаят",
+            "children": []
+          },
+          {
+            "value": "105951",
+            "label": "Дашогузский велаят",
+            "children": []
+          },
+          {
+            "value": "105952",
+            "label": "Лебапский велаят",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "171",
+        "label": "Узбекистан",
+        "children": [
+          {
+            "value": "105804",
+            "label": "Андижанская область",
+            "children": [
+              {
+                "value": "10329",
+                "label": "Андижан",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "105805",
+            "label": "Бухарская область",
+            "children": [
+              {
+                "value": "10330",
+                "label": "Бухара",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "105806",
+            "label": "Джизакская область",
+            "children": [
+              {
+                "value": "21606",
+                "label": "Джизак",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "105807",
+            "label": "Кашкадарьинская область",
+            "children": [
+              {
+                "value": "10331",
+                "label": "Карши",
+                "children": []
+              },
+              {
+                "value": "101761",
+                "label": "Шахрисабз",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "105809",
+            "label": "Наманганская область",
+            "children": [
+              {
+                "value": "21314",
+                "label": "Наманган",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "105816",
+            "label": "Республика Каракалпакстан",
+            "children": [
+              {
+                "value": "10337",
+                "label": "Нукус",
+                "children": []
+              },
+              {
+                "value": "193330",
+                "label": "Ходжейлийский район",
+                "children": [
+                  {
+                    "value": "193331",
+                    "label": "Ходжейли",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "value": "105811",
+            "label": "Сурхандарьинская область",
+            "children": [
+              {
+                "value": "196979",
+                "label": "Денауский район",
+                "children": [
+                  {
+                    "value": "196980",
+                    "label": "Денау",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "10338",
+                "label": "Термез",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "105812",
+            "label": "Сырдарьинская область",
+            "children": []
+          },
+          {
+            "value": "10335",
+            "label": "Ташкент",
+            "children": []
+          },
+          {
+            "value": "105813",
+            "label": "Ташкентская область",
+            "children": [
+              {
+                "value": "10328",
+                "label": "Алмалык",
+                "children": []
+              },
+              {
+                "value": "189657",
+                "label": "Ахангаранский район",
+                "children": [
+                  {
+                    "value": "101550",
+                    "label": "Ангрен",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "value": "101524",
+                "label": "Бекабад",
+                "children": []
+              },
+              {
+                "value": "114900",
+                "label": "Чирчик",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "29387",
+        "label": "Южная Осетия",
+        "children": []
+      }
+    ]
+  },
+  {
+    "value": "111",
+    "label": "Европа",
+    "children": [
+      {
+        "value": "113",
+        "label": "Австрия",
+        "children": [
+          {
+            "value": "104136",
+            "label": "Земля Вена",
+            "children": [
+              {
+                "value": "10371",
+                "label": "Вена",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "104130",
+            "label": "Нижняя Австрия",
+            "children": [
+              {
+                "value": "105219",
+                "label": "Санкт-Пёльтен",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "114",
+        "label": "Бельгия",
+        "children": [
+          {
+            "value": "10376",
+            "label": "Брюссель",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "115",
+        "label": "Болгария",
+        "children": [
+          {
+            "value": "10379",
+            "label": "София",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10057",
+        "label": "Босния и Герцеговина",
+        "children": []
+      },
+      {
+        "value": "102",
+        "label": "Великобритания",
+        "children": [
+          {
+            "value": "104520",
+            "label": "Англия",
+            "children": [
+              {
+                "value": "104584",
+                "label": "Восточная Англия",
+                "children": [
+                  {
+                    "value": "104612",
+                    "label": "Графство Кембриджшир",
+                    "children": [
+                      {
+                        "value": "10391",
+                        "label": "Кембридж",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "value": "10393",
+                "label": "Лондон",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "116",
+        "label": "Венгрия",
+        "children": [
+          {
+            "value": "104483",
+            "label": "Пешт",
+            "children": [
+              {
+                "value": "10398",
+                "label": "Будапешт",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "96",
+        "label": "Германия",
+        "children": [
+          {
+            "value": "177",
+            "label": "Берлин",
+            "children": []
+          },
+          {
+            "value": "103750",
+            "label": "Свободное государство Бавария",
+            "children": [
+              {
+                "value": "101738",
+                "label": "Ингольштадт",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "246",
+        "label": "Греция",
+        "children": [
+          {
+            "value": "10418",
+            "label": "Афины",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "203",
+        "label": "Дания",
+        "children": [
+          {
+            "value": "10425",
+            "label": "Копенгаген",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10063",
+        "label": "Ирландия",
+        "children": [
+          {
+            "value": "10426",
+            "label": "Дублин",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "204",
+        "label": "Испания",
+        "children": [
+          {
+            "value": "10435",
+            "label": "Мадрид",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "205",
+        "label": "Италия",
+        "children": [
+          {
+            "value": "10445",
+            "label": "Рим",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "20574",
+        "label": "Кипр",
+        "children": [
+          {
+            "value": "20575",
+            "label": "Никосия",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "117",
+        "label": "Литва",
+        "children": [
+          {
+            "value": "104260",
+            "label": "Вильнюсский уезд",
+            "children": [
+              {
+                "value": "11475",
+                "label": "Вильнюс",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "21203",
+        "label": "Люксембург",
+        "children": []
+      },
+      {
+        "value": "118",
+        "label": "Нидерланды",
+        "children": [
+          {
+            "value": "10466",
+            "label": "Амстердам",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "119",
+        "label": "Норвегия",
+        "children": [
+          {
+            "value": "10467",
+            "label": "Осло",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "120",
+        "label": "Польша",
+        "children": [
+          {
+            "value": "10472",
+            "label": "Варшава",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10074",
+        "label": "Португалия",
+        "children": [
+          {
+            "value": "10478",
+            "label": "Лиссабон",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10077",
+        "label": "Румыния",
+        "children": [
+          {
+            "value": "10487",
+            "label": "Бухарест",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10068",
+        "label": "Северная Македония",
+        "children": []
+      },
+      {
+        "value": "180",
+        "label": "Сербия",
+        "children": [
+          {
+            "value": "104492",
+            "label": "Округ Белград",
+            "children": [
+              {
+                "value": "10522",
+                "label": "Белград",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "121",
+        "label": "Словакия",
+        "children": [
+          {
+            "value": "10489",
+            "label": "Братислава",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "122",
+        "label": "Словения",
+        "children": [
+          {
+            "value": "10492",
+            "label": "Любляна",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "983",
+        "label": "Турция",
+        "children": [
+          {
+            "value": "103669",
+            "label": "Провинция Адана",
+            "children": []
+          },
+          {
+            "value": "103670",
+            "label": "Провинция Адыяман",
+            "children": []
+          },
+          {
+            "value": "103671",
+            "label": "Провинция Айдын",
+            "children": []
+          },
+          {
+            "value": "103672",
+            "label": "Провинция Аксарай",
+            "children": []
+          },
+          {
+            "value": "103673",
+            "label": "Провинция Амасья",
+            "children": []
+          },
+          {
+            "value": "103674",
+            "label": "Провинция Анкара",
+            "children": []
+          },
+          {
+            "value": "103675",
+            "label": "Провинция Анталья",
+            "children": []
+          },
+          {
+            "value": "103676",
+            "label": "Провинция Ардахан",
+            "children": []
+          },
+          {
+            "value": "103677",
+            "label": "Провинция Артвин",
+            "children": []
+          },
+          {
+            "value": "103678",
+            "label": "Провинция Афьонкарахисар",
+            "children": []
+          },
+          {
+            "value": "103679",
+            "label": "Провинция Байбурт",
+            "children": []
+          },
+          {
+            "value": "103680",
+            "label": "Провинция Балыкесир",
+            "children": []
+          },
+          {
+            "value": "103682",
+            "label": "Провинция Батман",
+            "children": []
+          },
+          {
+            "value": "103683",
+            "label": "Провинция Биледжик",
+            "children": []
+          },
+          {
+            "value": "103684",
+            "label": "Провинция Бингёль",
+            "children": []
+          },
+          {
+            "value": "103685",
+            "label": "Провинция Битлис",
+            "children": []
+          },
+          {
+            "value": "103686",
+            "label": "Провинция Болу",
+            "children": []
+          },
+          {
+            "value": "103687",
+            "label": "Провинция Бурдур",
+            "children": []
+          },
+          {
+            "value": "103688",
+            "label": "Провинция Бурса",
+            "children": []
+          },
+          {
+            "value": "103689",
+            "label": "Провинция Ван",
+            "children": []
+          },
+          {
+            "value": "103690",
+            "label": "Провинция Газиантеп",
+            "children": []
+          },
+          {
+            "value": "103691",
+            "label": "Провинция Гиресун",
+            "children": []
+          },
+          {
+            "value": "103692",
+            "label": "Провинция Гюмюшхане",
+            "children": []
+          },
+          {
+            "value": "103693",
+            "label": "Провинция Денизли",
+            "children": []
+          },
+          {
+            "value": "103694",
+            "label": "Провинция Диярбакыр",
+            "children": []
+          },
+          {
+            "value": "103695",
+            "label": "Провинция Дюздже",
+            "children": []
+          },
+          {
+            "value": "103696",
+            "label": "Провинция Зонгулдак",
+            "children": []
+          },
+          {
+            "value": "103697",
+            "label": "Провинция Измир",
+            "children": []
+          },
+          {
+            "value": "103698",
+            "label": "Провинция Йозгат",
+            "children": []
+          },
+          {
+            "value": "103699",
+            "label": "Провинция Кайсери",
+            "children": []
+          },
+          {
+            "value": "103700",
+            "label": "Провинция Карабюк",
+            "children": []
+          },
+          {
+            "value": "103701",
+            "label": "Провинция Караман",
+            "children": []
+          },
+          {
+            "value": "103702",
+            "label": "Провинция Карс",
+            "children": []
+          },
+          {
+            "value": "103703",
+            "label": "Провинция Кастамону",
+            "children": []
+          },
+          {
+            "value": "103704",
+            "label": "Провинция Кахраманмараш",
+            "children": []
+          },
+          {
+            "value": "103705",
+            "label": "Провинция Килис",
+            "children": []
+          },
+          {
+            "value": "103706",
+            "label": "Провинция Коджаэли",
+            "children": []
+          },
+          {
+            "value": "103707",
+            "label": "Провинция Конья",
+            "children": []
+          },
+          {
+            "value": "103708",
+            "label": "Провинция Кыркларели",
+            "children": []
+          },
+          {
+            "value": "103709",
+            "label": "Провинция Кыршехир",
+            "children": []
+          },
+          {
+            "value": "103710",
+            "label": "Провинция Кырыккале",
+            "children": []
+          },
+          {
+            "value": "103711",
+            "label": "Провинция Кютахья",
+            "children": []
+          },
+          {
+            "value": "103712",
+            "label": "Провинция Малатья",
+            "children": []
+          },
+          {
+            "value": "103713",
+            "label": "Провинция Маниса",
+            "children": []
+          },
+          {
+            "value": "103714",
+            "label": "Провинция Мардин",
+            "children": []
+          },
+          {
+            "value": "103715",
+            "label": "Провинция Мерсин",
+            "children": []
+          },
+          {
+            "value": "103716",
+            "label": "Провинция Мугла",
+            "children": []
+          },
+          {
+            "value": "103717",
+            "label": "Провинция Муш",
+            "children": []
+          },
+          {
+            "value": "103718",
+            "label": "Провинция Невшехир",
+            "children": []
+          },
+          {
+            "value": "103719",
+            "label": "Провинция Нигде",
+            "children": []
+          },
+          {
+            "value": "103720",
+            "label": "Провинция Орду",
+            "children": []
+          },
+          {
+            "value": "103722",
+            "label": "Провинция Ризе",
+            "children": []
+          },
+          {
+            "value": "103724",
+            "label": "Провинция Самсун",
+            "children": []
+          },
+          {
+            "value": "103725",
+            "label": "Провинция Сивас",
+            "children": []
+          },
+          {
+            "value": "103726",
+            "label": "Провинция Сиирт",
+            "children": []
+          },
+          {
+            "value": "103727",
+            "label": "Провинция Синоп",
+            "children": []
+          },
+          {
+            "value": "103728",
+            "label": "Провинция Стамбул",
+            "children": []
+          },
+          {
+            "value": "103729",
+            "label": "Провинция Текирдаг",
+            "children": []
+          },
+          {
+            "value": "103730",
+            "label": "Провинция Токат",
+            "children": []
+          },
+          {
+            "value": "103731",
+            "label": "Провинция Трабзон",
+            "children": []
+          },
+          {
+            "value": "103732",
+            "label": "Провинция Тунджели",
+            "children": []
+          },
+          {
+            "value": "103733",
+            "label": "Провинция Ушак",
+            "children": []
+          },
+          {
+            "value": "103734",
+            "label": "Провинция Хаккяри",
+            "children": []
+          },
+          {
+            "value": "103735",
+            "label": "Провинция Хатай",
+            "children": []
+          },
+          {
+            "value": "103736",
+            "label": "Провинция Чанаккале",
+            "children": []
+          },
+          {
+            "value": "103737",
+            "label": "Провинция Чанкыры",
+            "children": []
+          },
+          {
+            "value": "103739",
+            "label": "Провинция Шанлыурфа",
+            "children": []
+          },
+          {
+            "value": "103740",
+            "label": "Провинция Ширнак",
+            "children": []
+          },
+          {
+            "value": "103741",
+            "label": "Провинция Ыгдыр",
+            "children": []
+          },
+          {
+            "value": "103742",
+            "label": "Провинция Ыспарта",
+            "children": []
+          },
+          {
+            "value": "103743",
+            "label": "Провинция Эдирне",
+            "children": []
+          },
+          {
+            "value": "103744",
+            "label": "Провинция Элязыг",
+            "children": []
+          },
+          {
+            "value": "103745",
+            "label": "Провинция Эрзинджан",
+            "children": []
+          },
+          {
+            "value": "103746",
+            "label": "Провинция Эрзурум",
+            "children": []
+          },
+          {
+            "value": "103747",
+            "label": "Провинция Эскишехир",
+            "children": []
+          },
+          {
+            "value": "103748",
+            "label": "Провинция Ялова",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "123",
+        "label": "Финляндия",
+        "children": [
+          {
+            "value": "104357",
+            "label": "Уусимаа",
+            "children": [
+              {
+                "value": "10493",
+                "label": "Хельсинки",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "124",
+        "label": "Франция",
+        "children": [
+          {
+            "value": "10502",
+            "label": "Париж",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10083",
+        "label": "Хорватия",
+        "children": [
+          {
+            "value": "10507",
+            "label": "Загреб",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "21610",
+        "label": "Черногория",
+        "children": [
+          {
+            "value": "21611",
+            "label": "Подгорица",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "125",
+        "label": "Чехия",
+        "children": [
+          {
+            "value": "10511",
+            "label": "Прага",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "126",
+        "label": "Швейцария",
+        "children": [
+          {
+            "value": "10513",
+            "label": "Берн",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "127",
+        "label": "Швеция",
+        "children": [
+          {
+            "value": "10519",
+            "label": "Стокгольм",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "value": "183",
+    "label": "Азия",
+    "children": [
+      {
+        "value": "10091",
+        "label": "Бангладеш",
+        "children": [
+          {
+            "value": "10530",
+            "label": "Дакка",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10532",
+        "label": "Бахрейн",
+        "children": []
+      },
+      {
+        "value": "10093",
+        "label": "Вьетнам",
+        "children": [
+          {
+            "value": "10552",
+            "label": "Ханой",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "169",
+        "label": "Грузия",
+        "children": [
+          {
+            "value": "122054",
+            "label": "Автономная Республика Аджария",
+            "children": [
+              {
+                "value": "10278",
+                "label": "Батуми",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "122055",
+            "label": "Гурия",
+            "children": []
+          },
+          {
+            "value": "122062",
+            "label": "Квемо-Картли",
+            "children": [
+              {
+                "value": "10285",
+                "label": "Рустави",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "122058",
+            "label": "Мцхета-Мтианети",
+            "children": []
+          },
+          {
+            "value": "122059",
+            "label": "Рача-Лечхуми и Квемо-Сванети",
+            "children": []
+          },
+          {
+            "value": "122061",
+            "label": "Самцхе-Джавахети",
+            "children": []
+          },
+          {
+            "value": "10277",
+            "label": "Тбилиси",
+            "children": []
+          },
+          {
+            "value": "122063",
+            "label": "Шида-Картли",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "181",
+        "label": "Израиль",
+        "children": [
+          {
+            "value": "103905",
+            "label": "Тель-Авивский АО",
+            "children": [
+              {
+                "value": "131",
+                "label": "Тель-Авив",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "103901",
+            "label": "Хайфский АО",
+            "children": [
+              {
+                "value": "132",
+                "label": "Хайфа",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "103900",
+            "label": "Центральный АО",
+            "children": [
+              {
+                "value": "116114",
+                "label": "Ришон-ле-Цион",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "103904",
+            "label": "Южный АО",
+            "children": [
+              {
+                "value": "100944",
+                "label": "Ашкелон",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "994",
+        "label": "Индия",
+        "children": []
+      },
+      {
+        "value": "10095",
+        "label": "Индонезия",
+        "children": [
+          {
+            "value": "10572",
+            "label": "Провинция Бали",
+            "children": []
+          },
+          {
+            "value": "120805",
+            "label": "Столичный округ Джакарта",
+            "children": [
+              {
+                "value": "10574",
+                "label": "Джакарта",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "10535",
+        "label": "Иордания",
+        "children": [
+          {
+            "value": "11494",
+            "label": "Амман",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "21551",
+        "label": "Йемен",
+        "children": []
+      },
+      {
+        "value": "20975",
+        "label": "Камбоджа",
+        "children": []
+      },
+      {
+        "value": "21486",
+        "label": "Катар",
+        "children": [
+          {
+            "value": "219591",
+            "label": "Эд-Доха",
+            "children": [
+              {
+                "value": "21487",
+                "label": "Доха",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "134",
+        "label": "Китай",
+        "children": [
+          {
+            "value": "10584",
+            "label": "Гонконг (Сянган)",
+            "children": []
+          },
+          {
+            "value": "10590",
+            "label": "Пекин",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10537",
+        "label": "Кувейт",
+        "children": []
+      },
+      {
+        "value": "10097",
+        "label": "Малайзия",
+        "children": [
+          {
+            "value": "10604",
+            "label": "Куала-Лумпур",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10098",
+        "label": "Мальдивы",
+        "children": [
+          {
+            "value": "10605",
+            "label": "Мале",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10099",
+        "label": "Монголия",
+        "children": [
+          {
+            "value": "10606",
+            "label": "Улан-Батор",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "210",
+        "label": "Объединённые Арабские Эмираты",
+        "children": [
+          {
+            "value": "121477",
+            "label": "Эмират Абу-Даби",
+            "children": [
+              {
+                "value": "11498",
+                "label": "Абу-Даби",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "121479",
+            "label": "Эмират Дубай",
+            "children": [
+              {
+                "value": "11499",
+                "label": "Дубай",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "21586",
+        "label": "Оман",
+        "children": []
+      },
+      {
+        "value": "10102",
+        "label": "Пакистан",
+        "children": [
+          {
+            "value": "10614",
+            "label": "Исламабад",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10540",
+        "label": "Саудовская Аравия",
+        "children": [
+          {
+            "value": "121433",
+            "label": "Округ Мекка",
+            "children": [
+              {
+                "value": "114139",
+                "label": "Джидда",
+                "children": []
+              }
+            ]
+          },
+          {
+            "value": "121432",
+            "label": "Округ Эр-Рияд",
+            "children": [
+              {
+                "value": "11500",
+                "label": "Эр-Рияд",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "value": "10105",
+        "label": "Сингапур",
+        "children": []
+      },
+      {
+        "value": "995",
+        "label": "Таиланд",
+        "children": [
+          {
+            "value": "10620",
+            "label": "Бангкок",
+            "children": []
+          },
+          {
+            "value": "109046",
+            "label": "Као-Лак",
+            "children": []
+          },
+          {
+            "value": "21341",
+            "label": "Паттайя",
+            "children": []
+          },
+          {
+            "value": "122005",
+            "label": "Провинция Пхукет",
+            "children": []
+          },
+          {
+            "value": "109044",
+            "label": "Хуахин",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "29385",
+        "label": "Тайвань",
+        "children": [
+          {
+            "value": "10592",
+            "label": "Тайбэй",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10108",
+        "label": "Филиппины",
+        "children": [
+          {
+            "value": "10629",
+            "label": "Манила",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10109",
+        "label": "Шри-Ланка",
+        "children": [
+          {
+            "value": "10633",
+            "label": "Коломбо",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "135",
+        "label": "Южная Корея",
+        "children": [
+          {
+            "value": "10635",
+            "label": "Сеул",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "137",
+        "label": "Япония",
+        "children": [
+          {
+            "value": "10636",
+            "label": "Токио",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "value": "241",
+    "label": "Африка",
+    "children": [
+      {
+        "value": "20826",
+        "label": "Алжир",
+        "children": [
+          {
+            "value": "20828",
+            "label": "Алжир",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "1056",
+        "label": "Египет",
+        "children": [
+          {
+            "value": "11485",
+            "label": "Каир",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "20733",
+        "label": "Кот-д’Ивуар",
+        "children": [
+          {
+            "value": "20734",
+            "label": "Абиджан",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10020",
+        "label": "Марокко",
+        "children": [
+          {
+            "value": "10139",
+            "label": "Рабат",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "20741",
+        "label": "Нигерия",
+        "children": [
+          {
+            "value": "20742",
+            "label": "Абуджа",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10021",
+        "label": "ЮАР",
+        "children": [
+          {
+            "value": "10140",
+            "label": "Претория",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "value": "10002",
+    "label": "Северная Америка",
+    "children": [
+      {
+        "value": "20968",
+        "label": "Гватемала",
+        "children": []
+      },
+      {
+        "value": "20917",
+        "label": "Доминиканская Республика",
+        "children": []
+      },
+      {
+        "value": "95",
+        "label": "Канада",
+        "children": [
+          {
+            "value": "10114",
+            "label": "Оттава",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "21131",
+        "label": "Коста-Рика",
+        "children": []
+      },
+      {
+        "value": "20271",
+        "label": "Мексика",
+        "children": [
+          {
+            "value": "20272",
+            "label": "Мехико",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "21231",
+        "label": "Никарагуа",
+        "children": []
+      },
+      {
+        "value": "21299",
+        "label": "Панама",
+        "children": []
+      },
+      {
+        "value": "84",
+        "label": "США",
+        "children": [
+          {
+            "value": "87",
+            "label": "Вашингтон",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "value": "10003",
+    "label": "Южная Америка",
+    "children": [
+      {
+        "value": "93",
+        "label": "Аргентина",
+        "children": [
+          {
+            "value": "10133",
+            "label": "Буэнос-Айрес",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "10015",
+        "label": "Боливия",
+        "children": []
+      },
+      {
+        "value": "94",
+        "label": "Бразилия",
+        "children": [
+          {
+            "value": "10136",
+            "label": "Бразилиа",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "21184",
+        "label": "Венесуэла",
+        "children": []
+      },
+      {
+        "value": "21191",
+        "label": "Колумбия",
+        "children": [
+          {
+            "value": "21174",
+            "label": "Богота",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "20992",
+        "label": "Парагвай",
+        "children": []
+      },
+      {
+        "value": "21156",
+        "label": "Перу",
+        "children": [
+          {
+            "value": "21157",
+            "label": "Лима",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "21289",
+        "label": "Уругвай",
+        "children": []
+      },
+      {
+        "value": "20862",
+        "label": "Чили",
+        "children": [
+          {
+            "value": "20963",
+            "label": "Сантьяго",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "20785",
+        "label": "Эквадор",
+        "children": []
+      }
+    ]
+  },
+  {
+    "value": "138",
+    "label": "Австралия и Океания",
+    "children": [
+      {
+        "value": "211",
+        "label": "Австралия",
+        "children": [
+          {
+            "value": "10144",
+            "label": "Канберра",
+            "children": []
+          }
+        ]
+      },
+      {
+        "value": "139",
+        "label": "Новая Зеландия",
+        "children": [
+          {
+            "value": "10147",
+            "label": "Веллингтон",
+            "children": []
+          }
+        ]
       }
     ]
   }

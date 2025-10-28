@@ -6,6 +6,9 @@ from __future__ import annotations
 import os
 import sys
 
+# Установить UTF-8 кодировку
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+
 
 def _bootstrap() -> None:
     script_dir = os.path.dirname(os.path.abspath(__file__))
