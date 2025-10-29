@@ -785,21 +785,21 @@ class ParsingTab(QWidget):
         self.btn_selection.setToolButtonStyle(Qt.ToolButtonTextOnly)
         self._selection_menu = QMenu(self.btn_selection)
         self._action_select_all = self._selection_menu.addAction(
-            "Выбрать все",
+            "✓ Выбрать все",
             self.select_all,
             "Ctrl+A",
         )
         self._action_deselect_all = self._selection_menu.addAction(
-            "Снять выбор",
+            "✗ Снять выбор",
             self.deselect_all,
         )
         self._action_invert_selection = self._selection_menu.addAction(
-            "Инвертировать выбор",
+            "⟲ Инвертировать",
             self.invert_selection,
         )
         self._selection_menu.addSeparator()
         self._action_select_by_filter = self._selection_menu.addAction(
-            "Выделить по фильтру...",
+            "🔍 Выделить по фильтру...",
             self.select_by_filter,
         )
         self.btn_selection.setMenu(self._selection_menu)
@@ -855,7 +855,16 @@ class ParsingTab(QWidget):
         
         # Заголовок
         title = QLabel("Управление группами")
-        title.setStyleSheet("font-weight: bold; font-size: 12px;")
+        title.setStyleSheet("""
+            QLabel {
+                font-weight: bold;
+                font-size: 13px;
+                padding: 5px;
+                background-color: #f0f0f0;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+            }
+        """)
         layout.addWidget(title)
         
         # Мини-тулбар для групп
@@ -863,17 +872,65 @@ class ParsingTab(QWidget):
         
         self.btn_add_group = QPushButton("+")
         self.btn_add_group.setToolTip("Создать группу")
-        self.btn_add_group.setFixedSize(30, 30)
-        self.btn_add_group.clicked.connect(self._create_group)
+        self.btn_add_group.setFixedSize(35, 35)
+        self.btn_add_group.setStyleSheet("""
+            QPushButton {
+                font-size: 18px;
+                font-weight: bold;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
+        self.btn_add_group.clicked.connect(self._on_create_group)
         
         self.btn_delete_group = QPushButton("-")
         self.btn_delete_group.setToolTip("Удалить группу")
-        self.btn_delete_group.setFixedSize(30, 30)
-        self.btn_delete_group.clicked.connect(self._delete_group)
+        self.btn_delete_group.setFixedSize(35, 35)
+        self.btn_delete_group.setStyleSheet("""
+            QPushButton {
+                font-size: 18px;
+                font-weight: bold;
+                background-color: #f44336;
+                color: white;
+                border: none;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #da190b;
+            }
+            QPushButton:pressed {
+                background-color: #c41005;
+            }
+        """)
+        self.btn_delete_group.clicked.connect(self._on_delete_group)
         
         self.btn_sort_group = QPushButton("S")
-        self.btn_sort_group.setToolTip("Сортировать")
-        self.btn_sort_group.setFixedSize(30, 30)
+        self.btn_sort_group.setToolTip("Сортировать группы")
+        self.btn_sort_group.setFixedSize(35, 35)
+        self.btn_sort_group.setStyleSheet("""
+            QPushButton {
+                font-size: 14px;
+                font-weight: bold;
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #0b7dda;
+            }
+            QPushButton:pressed {
+                background-color: #0960a8;
+            }
+        """)
         self.btn_sort_group.clicked.connect(self._on_sort_groups)
         
         toolbar_layout.addWidget(self.btn_add_group)
@@ -887,6 +944,23 @@ class ParsingTab(QWidget):
         self.groups_tree = QTreeWidget()
         self.groups_tree.setHeaderLabel("Группа / Фраза")
         self.groups_tree.setMaximumWidth(350)
+        self.groups_tree.setStyleSheet("""
+            QTreeWidget {
+                border: 1px solid #ccc;
+                background-color: white;
+                border-radius: 3px;
+            }
+            QTreeWidget::item {
+                padding: 5px;
+            }
+            QTreeWidget::item:selected {
+                background-color: #4CAF50;
+                color: white;
+            }
+            QTreeWidget::item:hover {
+                background-color: #e8f5e9;
+            }
+        """)
         self.groups_tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.groups_tree.customContextMenuRequested.connect(self._on_groups_context_menu)
         self.groups_tree.itemClicked.connect(self._on_group_selected)
@@ -985,9 +1059,16 @@ class ParsingTab(QWidget):
         self._configure_table_columns(self._active_regions)
         row_idx = self.table.rowCount()
         self.table.insertRow(row_idx)
+
         checkbox = QCheckBox()
         checkbox.setChecked(checked)
-        self.table.setCellWidget(row_idx, 0, checkbox)
+        checkbox_container = QWidget()
+        checkbox_layout = QHBoxLayout(checkbox_container)
+        checkbox_layout.setContentsMargins(0, 0, 0, 0)
+        checkbox_layout.setAlignment(Qt.AlignCenter)
+        checkbox_layout.addWidget(checkbox)
+        self.table.setCellWidget(row_idx, 0, checkbox_container)
+
         self._set_cell_text(row_idx, 1, row_idx + 1)
         self._set_cell_text(row_idx, 2, phrase)
         for idx in range(len(self._region_order)):
@@ -1000,15 +1081,27 @@ class ParsingTab(QWidget):
 
     def _get_checkbox(self, row: int) -> QCheckBox | None:
         widget = self.table.cellWidget(row, 0)
-        return widget if isinstance(widget, QCheckBox) else None
+        if isinstance(widget, QCheckBox):
+            return widget
+        if widget:
+            checkbox = widget.findChild(QCheckBox)
+            if isinstance(checkbox, QCheckBox):
+                return checkbox
+        return None
 
-    def _ensure_checkbox(self, row: int, checked: bool | None = None) -> None:
+    def _ensure_checkbox(self, row: int, checked: bool | None = None) -> QCheckBox | None:
         checkbox = self._get_checkbox(row)
         if checkbox is None:
             checkbox = QCheckBox()
-            self.table.setCellWidget(row, 0, checkbox)
-        if checked is not None:
+            container = QWidget()
+            layout = QHBoxLayout(container)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setAlignment(Qt.AlignCenter)
+            layout.addWidget(checkbox)
+            self.table.setCellWidget(row, 0, container)
+        if checked is not None and checkbox is not None:
             checkbox.setChecked(checked)
+        return checkbox
 
     def _get_all_phrases(self) -> List[str]:
         phrases: List[str] = []
@@ -1280,8 +1373,30 @@ class ParsingTab(QWidget):
         self._invert_selection()
 
     def _select_by_filter(self):
-        """Выделить фразы по фильтру (заглушка для будущей функциональности)"""
-        self._append_log("ℹ️ Выделение по фильтру (в разработке)")
+        """Выделить фразы по фильтру"""
+        from PySide6.QtWidgets import QInputDialog
+        
+        filter_text, ok = QInputDialog.getText(
+            self,
+            "Фильтр выделения",
+            "Введите текст для поиска в фразах:"
+        )
+        
+        if not ok or not filter_text.strip():
+            return
+        
+        filter_text = filter_text.strip().lower()
+        count = 0
+        
+        for row in range(self.table.rowCount()):
+            phrase_item = self.table.item(row, 2)
+            if phrase_item and filter_text in phrase_item.text().lower():
+                checkbox = self._get_checkbox(row)
+                if checkbox:
+                    checkbox.setChecked(True)
+                    count += 1
+        
+        self._append_log(f"🔍 Найдено и выбрано {count} фраз по фильтру '{filter_text}'")
 
     def select_by_filter(self):
         """Выделить фразы по фильтру (публичный метод)"""
@@ -1377,7 +1492,7 @@ class ParsingTab(QWidget):
                     max_id = child["id"]
         return max_id + 1
 
-    def _create_group(self):
+    def _on_create_group(self):
         """Создать новую группу"""
         from PySide6.QtWidgets import QInputDialog
         
@@ -1413,7 +1528,7 @@ class ParsingTab(QWidget):
         
         QMessageBox.information(self, "Готово", f"Группа '{name.strip()}' создана!")
 
-    def _delete_group(self):
+    def _on_delete_group(self):
         """Удалить выбранную группу"""
         if not hasattr(self, "groups_tree") or self.groups_tree is None:
             self._append_log("❌ Дерево групп не инициализировано")
@@ -1447,7 +1562,7 @@ class ParsingTab(QWidget):
         self._save_groups()
         self._append_log(f"🗑️ Удалена группа: {name}")
 
-    def _rename_group(self):
+    def _on_rename_group(self):
         """Переименовать выбранную группу"""
         if not hasattr(self, "groups_tree") or self.groups_tree is None:
             self._append_log("❌ Дерево групп не инициализировано")
@@ -1487,7 +1602,7 @@ class ParsingTab(QWidget):
         """Переименовать группу при двойном клике"""
         if not item:
             return
-        self._rename_group()
+        self._on_rename_group()
 
     def _on_groups_context_menu(self, position):
         """Контекстное меню для дерева групп"""
@@ -1499,14 +1614,14 @@ class ParsingTab(QWidget):
         selected_items = self.groups_tree.selectedItems()
         
         action_create = menu.addAction("➕ Создать группу")
-        action_create.triggered.connect(self._create_group)
+        action_create.triggered.connect(self._on_create_group)
         
         if selected_items:
             action_rename = menu.addAction("✏️ Переименовать")
-            action_rename.triggered.connect(self._rename_group)
+            action_rename.triggered.connect(self._on_rename_group)
             
             action_delete = menu.addAction("🗑️ Удалить")
-            action_delete.triggered.connect(self._delete_group)
+            action_delete.triggered.connect(self._on_delete_group)
             
             menu.addSeparator()
             
@@ -2070,6 +2185,10 @@ class ParsingTab(QWidget):
         """Добавить сообщение в журнал активности."""
         if hasattr(self, "activity_log") and self.activity_log is not None:
             self.activity_log.append_line(message)
+        
+    def _log_activity(self, message: str):
+        """Совместимый алиас для журналирования действий."""
+        self._append_log(message)
         
     def _on_profile_log(self, profile_email: str, message: str):
         """Обработка лога от конкретного профиля."""
