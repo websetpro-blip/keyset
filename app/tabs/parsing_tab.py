@@ -472,10 +472,11 @@ class MultiParsingWorker(QThread):
 class ParsingTab(QWidget):
     """Улучшенная вкладка парсинга с поддержкой многопоточности"""
     
-    def __init__(self, parent: QWidget | None = None, keys_panel: KeysPanel | None = None):
+    def __init__(self, parent: QWidget | None = None, keys_panel: KeysPanel | None = None, activity_log: ActivityLogWidget | None = None):
         super().__init__(parent)
         self._worker = None
         self._keys_panel = keys_panel
+        self.activity_log = activity_log
         self._last_settings = self._normalize_wordstat_settings(None)
         self._active_profiles: List[dict] = []
         self._active_phrases: List[str] = []
@@ -768,7 +769,6 @@ class ParsingTab(QWidget):
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.table.setMinimumHeight(400)
 
         center_layout.addWidget(self.table)
 
@@ -776,16 +776,12 @@ class ParsingTab(QWidget):
         splitter_main.addWidget(left_panel)
         splitter_main.addWidget(center_panel)
 
-        # Пропорции: Левая ~100px, Центр ~900px
+        # Пропорции: Левая панель не растягивается, Центр растягивается
+        splitter_main.setStretchFactor(0, 0)
+        splitter_main.setStretchFactor(1, 1)
         splitter_main.setSizes([100, 900])
 
         main_layout.addWidget(splitter_main)
-
-        # ═══════════════════════════════════════════════════════════
-        # 3️⃣ BOTTOM JOURNAL - журнал внизу
-        # ═══════════════════════════════════════════════════════════
-        self.activity_log = ActivityLogWidget(self)
-        main_layout.addWidget(self.activity_log)
         
     def _wire_signals(self):
         """Подключение сигналов"""

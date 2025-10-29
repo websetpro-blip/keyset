@@ -31,11 +31,6 @@ from PySide6.QtWidgets import (
 from .keys_panel import KeysPanel
 from .widgets.activity_log import ActivityLogWidget
 
-try:
-    from .tabs.parsing_tab import ParsingTab
-except ImportError:
-    ParsingTab = None
-
 
 class AccountDialog(QDialog):
     """Диалог создания/редактирования аккаунта Яндекса."""
@@ -163,24 +158,12 @@ class MainWindow(QMainWindow):
         )
         self.tabs.addTab(self.accounts, "Аккаунты")
 
-        if ParsingTab is not None:
-            try:
-                self.parsing = ParsingTab(parent=self, keys_panel=self.keys_panel, activity_log=self.log_widget)
-            except TypeError:
-                try:
-                    self.parsing = ParsingTab(parent=self, keys_panel=self.keys_panel)
-                except TypeError:
-                    try:
-                        self.parsing = ParsingTab(parent=self)
-                    except TypeError:
-                        self.parsing = ParsingTab()
-        else:
-            self.parsing = self._instantiate_widget(
-                module="keyset.app.tabs.parsing_tab",
-                class_name="ParsingTab",
-                parent=self,
-                fallback=lambda parent: QWidget(parent),
-            )
+        self.parsing = self._instantiate_widget(
+            module="keyset.app.tabs.parsing_tab",
+            class_name="ParsingTab",
+            parent=self,
+            fallback=lambda parent: QWidget(parent),
+        )
         if hasattr(self.parsing, "set_keys_panel"):
             try:
                 self.parsing.set_keys_panel(self.keys_panel)  # type: ignore[attr-defined]
