@@ -925,27 +925,6 @@ class ParsingTab(QWidget):
         """Обработчик выбора группы"""
         group_name = item.text(column)
         self._append_log(f"Выбрана группа: {group_name}")
-        # TOP PANEL кнопки
-        self._action_add_phrases.triggered.connect(self._show_add_phrases_dialog)
-        self._action_add_from_file.triggered.connect(self._on_add_from_file)
-        self._action_add_from_clipboard.triggered.connect(self._on_add_from_clipboard)
-        self._action_clear_phrases.triggered.connect(self._on_clear_results)
-        self.btn_delete.clicked.connect(self._on_delete_phrases)
-        self.btn_ws.clicked.connect(self._on_wordstat_dropdown)
-        self.btn_batch.clicked.connect(self._on_batch_parsing)
-        self.btn_forecast.clicked.connect(self._on_forecast)
-        self.btn_clear.clicked.connect(self._on_clear_results)
-        self.btn_export.clicked.connect(self._on_export_clicked)
-        
-        # Устанавливаем иконки для кнопок
-        self.btn_ws.setIcon(icon("frequency"))
-        self.btn_batch.setIcon(icon("batch"))
-        self.btn_forecast.setIcon(icon("forecast"))
-
-        # Кнопки управления парсингом
-        self.btn_run.clicked.connect(self._on_wordstat_dropdown)
-        self.btn_stop.clicked.connect(self._on_stop_parsing)
-        self.btn_pause.clicked.connect(self._on_pause_parsing)
 
     def _get_selected_profiles(self) -> List[dict]:
         """Получить все профили из БД (вкладка Аккаунты)"""
