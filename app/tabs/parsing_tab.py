@@ -2,11 +2,23 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QSplitter, QPushButton,
                                QTextEdit, QLabel, QSpinBox, QCheckBox, QComboBox, QTableWidget, 
-                               QTableWidgetItem, QProgressBar)
-from PySide6.QtCore import Qt, QThread, Signal
+                               QTableWidgetItem, QProgressBar, QInputDialog, QFileDialog, QApplication)
+from PySide6.QtCore import Qt, QThread, Signal, QPoint
 from ..widgets.geo_tree import GeoTree
 from ..keys_panel import KeysPanel  # Используем существующий KeysPanel
+from ..widgets.add_actions_popup import AddActionsPopup
 import time
+
+
+def _to_int0(value):
+    """Convert value to int, return 0 for empty/None values"""
+    if value is None or value == '' or value == '-':
+        return 0
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return 0
+
 
 class ParsingWorker(QThread):
     """Воркер для парсинга в отдельном потоке"""
@@ -48,7 +60,7 @@ class ParsingWorker(QThread):
                     # Базовая частотность
                     try:
                         result = freq_service.parse_frequency([phrase], self.geo_ids[0] if self.geo_ids else 225)
-                        rec["ws"] = result[0].get("freq_total", 0) if result else 0
+                        rec["ws"] = _to_int0(result[0].get("freq_total", 0) if result else 0)
                     except Exception:
                         rec["ws"] = 0
                 
@@ -56,7 +68,7 @@ class ParsingWorker(QThread):
                     # В кавычках
                     try:
                         result = freq_service.parse_frequency([f'"{phrase}"'], self.geo_ids[0] if self.geo_ids else 225)
-                        rec["qws"] = result[0].get("freq_quotes", 0) if result else 0
+                        rec["qws"] = _to_int0(result[0].get("freq_quotes", 0) if result else 0)
                     except Exception:
                         rec["qws"] = 0
                 
@@ -66,7 +78,7 @@ class ParsingWorker(QThread):
                         words = phrase.split()
                         exact_phrase = " ".join([f"!{w}" for w in words])
                         result = freq_service.parse_frequency([exact_phrase], self.geo_ids[0] if self.geo_ids else 225)
-                        rec["bws"] = result[0].get("freq_exact", 0) if result else 0
+                        rec["bws"] = _to_int0(result[0].get("freq_exact", 0) if result else 0)
                     except Exception:
                         rec["bws"] = 0
             else:
@@ -159,6 +171,12 @@ class ParsingTab(QWidget):
         
         # Кнопки
         buttons = QHBoxLayout()
+        
+        # Add button with popup (like Frequency button)
+        self.btn_add = QPushButton("Добавить")
+        self.btn_add.clicked.connect(self._open_add_popup)
+        buttons.addWidget(self.btn_add)
+        
         self.btn_run = QPushButton("▶ ЗАПУСТИТЬ ПАРСИНГ")
         self.btn_stop = QPushButton("■ ОСТАНОВИТЬ")
         self.btn_stop.setEnabled(False)
@@ -269,16 +287,20 @@ class ParsingTab(QWidget):
             
             values = [
                 row["phrase"],
-                str(row.get("ws", "")),
-                str(row.get("qws", "")),
-                str(row.get("bws", "")),
+                str(_to_int0(row.get("ws", 0))),
+                str(_to_int0(row.get("qws", 0))),
+                str(_to_int0(row.get("bws", 0))),
                 row.get("status", ""),
                 time.strftime("%H:%M:%S"),
                 "➜"  # Кнопка действий
             ]
             
             for j, val in enumerate(values):
-                self.table.setItem(i, j, QTableWidgetItem(str(val)))
+                item = QTableWidgetItem(str(val))
+                # Right align numeric columns
+                if j in (1, 2, 3):
+                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                self.table.setItem(i, j, item)
         
         # Обновляем правую панель - добавляем фразы в группы
         # Группируем по первому слову для демонстрации
@@ -291,9 +313,9 @@ class ParsingTab(QWidget):
             first_word = phrase.split()[0] if phrase else "Прочее"
             groups_data[first_word].append({
                 "phrase": phrase,
-                "freq": r.get("ws", 0),
-                "freq_quotes": r.get("qws", 0),
-                "freq_exact": r.get("bws", 0)
+                "freq": _to_int0(r.get("ws", 0)),
+                "freq_quotes": _to_int0(r.get("qws", 0)),
+                "freq_exact": _to_int0(r.get("bws", 0))
             })
         
         # Конвертируем в формат для KeysPanel
@@ -301,7 +323,6 @@ class ParsingTab(QWidget):
     
     def on_export(self):
         """Экспорт в CSV"""
-        from PySide6.QtWidgets import QFileDialog
         import csv
         
         filename, _ = QFileDialog.getSaveFileName(self, "Экспорт в CSV", "", "CSV Files (*.csv)")
@@ -313,10 +334,68 @@ class ParsingTab(QWidget):
             row = []
             for j in range(self.table.columnCount() - 1):  # Без колонки действий
                 item = self.table.item(i, j)
-                row.append(item.text() if item else "")
+                value = item.text() if item else ""
+                # Convert numeric columns to 0 if empty
+                if j in (1, 2, 3):  # WS, "WS", !WS columns
+                    value = str(_to_int0(value))
+                row.append(value)
             rows.append(row)
         
         with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
             writer = csv.writer(f)
             writer.writerow(["Фраза", "WS", '"WS"', "!WS", "Статус", "Время"])
             writer.writerows(rows)
+    
+    def _open_add_popup(self):
+        """Open popup panel below Add button"""
+        popup = AddActionsPopup(self)
+        pos = self.btn_add.mapToGlobal(QPoint(0, self.btn_add.height()))
+        popup.move(pos)
+        popup.show()
+    
+    def on_add_phrases_dialog(self):
+        """Add phrases via dialog"""
+        text, ok = QInputDialog.getMultiLineText(
+            self,
+            "Добавить фразы",
+            "Введите фразы (по одной на строку):",
+            self.phrases_edit.toPlainText()
+        )
+        if ok:
+            self.phrases_edit.setPlainText(text)
+    
+    def on_load_from_file(self):
+        """Load phrases from file"""
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Загрузить фразы из файла",
+            "",
+            "Text Files (*.txt);;All Files (*.*)"
+        )
+        if filename:
+            try:
+                with open(filename, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                self.phrases_edit.setPlainText(content)
+            except Exception as e:
+                from PySide6.QtWidgets import QMessageBox
+                QMessageBox.warning(self, "Ошибка", f"Не удалось загрузить файл:\n{str(e)}")
+    
+    def on_import_from_clipboard(self):
+        """Import phrases from clipboard"""
+        clipboard = QApplication.clipboard()
+        text = clipboard.text()
+        if text:
+            self.phrases_edit.setPlainText(text)
+    
+    def on_clear_table(self):
+        """Clear the results table"""
+        from PySide6.QtWidgets import QMessageBox
+        reply = QMessageBox.question(
+            self,
+            "Очистить таблицу",
+            "Вы уверены, что хотите очистить таблицу результатов?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.table.setRowCount(0)

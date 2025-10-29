@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
@@ -841,7 +841,7 @@ class ResultViewerDialog(QDialog):
             handle.seek(0)
             delimiter = ';'
             try:
-                dialect = csv.Sniffer().sniff(sample, delimiters=';	,')
+                dialect = csv.Sniffer().sniff(sample, delimiters=';    ,')
                 delimiter = dialect.delimiter
             except Exception:
                 pass
@@ -1060,17 +1060,26 @@ class FrequencyResultsTab(QWidget):
         stats_text = ", ".join(f"{key}: {value}" for key, value in stats.items())
         self.stats_label.setText(f"Статистика: {stats_text}")
 
+        # Helper function to convert to int with 0 fallback
+        def to_int0(val):
+            if val is None or val == '' or val == '-':
+                return 0
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                return 0
+
         self.table.setRowCount(len(results))
         for row_idx, row in enumerate(results):
             values = [
                 row['mask'],                              # Фраза
                 str(row['region']),                       # Регион
                 row['status'],                            # Статус
-                str(row['freq_total']),                   # WS (базовая)
-                str(row.get('freq_quotes', 0)),           # "WS" (в кавычках) ← НОВАЯ КОЛОНКА
-                str(row['freq_exact']),                   # !WS (точное)
-                str(row['attempts']),                     # Попытки
-                row['error'],                             # Ошибка
+                str(to_int0(row.get('freq_total', 0))),   # WS (базовая)
+                str(to_int0(row.get('freq_quotes', 0))),  # "WS" (в кавычках)
+                str(to_int0(row.get('freq_exact', 0))),   # !WS (точное)
+                str(to_int0(row.get('attempts', 0))),     # Попытки
+                row.get('error', ''),                     # Ошибка
             ]
             for col_idx, value in enumerate(values):
                 item = QTableWidgetItem(value)
