@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-XMind Parser - используем xmindparser из интернета
-Версия: 6.0 - Официальная библиотека
+XMind Parser - поддержка XMind 8 и XMind 2020/Zen
+Версия: 7.0 - с MindNode и типизацией по меткам
 """
 from __future__ import annotations
-from typing import Dict, List
+from dataclasses import dataclass, field
+from typing import List, Optional, Dict
 from pathlib import Path
 import sys
 import io
 
-# ⚠️ КРИТИЧНО: Установить правильную кодировку для вывода
 if sys.stdout.encoding.lower() != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
@@ -20,8 +20,27 @@ except ImportError:
     XMINDPARSER_AVAILABLE = False
 
 
+@dataclass
+class MindNode:
+    """Узел XMind карты с иерархией"""
+    title: str
+    notes: Optional[str] = None
+    labels: List[str] = field(default_factory=list)
+    node_type: str = "GEN"  # CORE | COMMERCIAL | INFO | ATTR | EXCLUDE | GEN
+    children: List["MindNode"] = field(default_factory=list)
+
+
+TYPE_BY_LABEL = {
+    "CORE": "CORE",
+    "COMMERCIAL": "COMMERCIAL",
+    "INFO": "INFO",
+    "ATTR": "ATTR",
+    "EXCLUDE": "EXCLUDE",
+}
+
+
 class XMindParser:
-    """Парсер XMind файлов - обёртка над xmindparser"""
+    """Парсер XMind файлов с поддержкой иерархии и типов по меткам"""
     
     def __init__(self, filepath: str):
         self.filepath = Path(filepath)
@@ -35,55 +54,87 @@ class XMindParser:
                 "Установите: pip install xmindparser"
             )
     
-    def parse(self) -> Dict:
-        """Парсить XMind файл и вернуть структуру с иерархией"""
+    def load(self, path: str = None) -> MindNode:
+        """Загрузить XMind файл и вернуть корневой MindNode"""
+        if path:
+            self.filepath = Path(path)
+        
         try:
-            raw_data = xmind_to_dict(str(self.filepath))
-            return self._convert_to_keyset_format(raw_data)
+            sheets = xmind_to_dict(str(self.filepath))
+            if not sheets:
+                return MindNode(title="Empty")
+            
+            sheet = sheets[0]
+            root_topic = sheet.get("topic", {})
+            return self._topic_to_node(root_topic)
         except Exception as e:
-            print(f"❌ Ошибка парсинга: {str(e)}")
-            return {'title': f'Error: {str(e)}', 'branches': []}
+            print(f"❌ Ошибка парсинга XMind: {str(e)}")
+            return MindNode(title=f"Error: {str(e)}")
     
-    def _convert_to_keyset_format(self, raw_data: Dict) -> Dict:
-        """Конвертировать формат xmindparser в формат KeySet"""
-        title = raw_data.get('title', 'XMind Project')
-        sheets = raw_data.get('sheets', [])
-        
-        if not sheets:
-            return {'title': title, 'branches': []}
-        
-        first_sheet = sheets[0]
-        
-        root_topic = first_sheet.get('rootTopic')
-        if not root_topic:
-            return {'title': title, 'branches': []}
-        
-        branches = self._parse_topic(root_topic)
-        return {'title': title, 'branches': branches}
+    def parse(self) -> Dict:
+        """Парсить XMind файл и вернуть структуру для совместимости с MasksTab"""
+        root_node = self.load()
+        return self._node_to_legacy_format(root_node)
     
-    def _parse_topic(self, topic: Dict, level: int = 0, parent_id: str | None = None) -> List[Dict]:
-        """Парсить топик рекурсивно"""
+    def _topic_to_node(self, topic: dict) -> MindNode:
+        """Конвертировать топик из xmindparser в MindNode"""
         if not isinstance(topic, dict):
-            return []
+            return MindNode(title="Invalid")
         
-        title = topic.get('title', 'Untitled')
-        topic_id = topic.get('id', f"topic_{id(topic)}")
+        title = topic.get("title") or topic.get("topic") or ""
+        labels = topic.get("labels") or []
         
-        children_list: List[Dict] = []
-        children = topic.get('children', [])
-        if children and isinstance(children, list):
-            for child in children:
-                children_list.extend(self._parse_topic(child, level + 1, topic_id))
+        notes = None
+        if "notes" in topic:
+            n = topic["notes"]
+            notes = n.get("plain") if isinstance(n, dict) else str(n)
+        
+        node_type = "GEN"
+        for lb in labels:
+            lb_upper = lb.upper()
+            if lb_upper in TYPE_BY_LABEL:
+                node_type = TYPE_BY_LABEL[lb_upper]
+                break
+        
+        node = MindNode(
+            title=title.strip() if title else "",
+            notes=notes,
+            labels=labels,
+            node_type=node_type
+        )
+        
+        for child in topic.get("topics", []):
+            node.children.append(self._topic_to_node(child))
+        
+        return node
+    
+    def _node_to_legacy_format(self, node: MindNode) -> Dict:
+        """Конвертировать MindNode в старый формат для совместимости"""
+        branches = self._node_to_branches(node)
+        return {
+            'title': node.title or 'XMind Project',
+            'branches': branches
+        }
+    
+    def _node_to_branches(self, node: MindNode, level: int = 0, parent_id: str = None) -> List[Dict]:
+        """Рекурсивно конвертировать MindNode в список веток"""
+        node_id = f"node_{id(node)}"
+        
+        children_list = []
+        for child in node.children:
+            children_list.extend(self._node_to_branches(child, level + 1, node_id))
         
         branch = {
-            'id': topic_id,
-            'title': title.strip() if title else 'Untitled',
+            'id': node_id,
+            'title': node.title,
             'level': level,
             'parent': parent_id,
             'children': children_list,
-            'type': 'CORE',
+            'type': node.node_type,
             'weight': 1.0,
             'active': True,
+            'labels': node.labels,
+            'notes': node.notes,
         }
         
         return [branch]
@@ -95,23 +146,24 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         filepath = sys.argv[1]
         parser = XMindParser(filepath)
-        data = parser.parse()
+        root = parser.load()
         
-        print(f"\n✓ Title: {data['title']}")
-        print(f"✓ Total branches: {len(data['branches'])}\n")
+        print(f"\n✓ Title: {root.title}")
+        print(f"✓ Type: {root.node_type}")
+        print(f"✓ Children: {len(root.children)}\n")
         print("Tree structure:")
         
-        def print_tree(branches, indent=0):
-            for b in branches:
-                children_count = len(b.get('children', []))
-                print("  " * indent + f"├─ {b['title']} (children: {children_count})")
-                if b.get('children'):
-                    print_tree(b['children'], indent + 1)
+        def print_tree(node: MindNode, indent=0):
+            children_count = len(node.children)
+            type_str = f"[{node.node_type}]" if node.node_type != "GEN" else ""
+            print("  " * indent + f"├─ {node.title} {type_str} (children: {children_count})")
+            for child in node.children:
+                print_tree(child, indent + 1)
         
-        print_tree(data['branches'])
+        print_tree(root)
     else:
         print("Usage: python xmind_parser.py /path/to/file.xmind")
         print("\nИли используйте в коде:")
-        print("  from xmind_parser import XMindParser")
+        print("  from core.xmind_parser import XMindParser")
         print("  parser = XMindParser('file.xmind')")
-        print("  data = parser.parse()")
+        print("  root = parser.load()")

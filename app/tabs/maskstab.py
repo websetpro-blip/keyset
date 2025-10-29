@@ -1,19 +1,23 @@
 # -*- coding: utf-8 -*-
 """
 MasksTab - Инструмент для работы с масками ключевых слов
-Версия: 4.0 с поддержкой XMind и Smart Multiplier
-(скопировано из новое/КЕЙСЕТ/Маски/MASKSTAB_FULL_CODE.md)
+Версия: 5.0 с умным генератором, морфологией и визуализацией mind-map
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QTextEdit, QTableWidget, QTableWidgetItem, QSpinBox, QComboBox,
     QTabWidget, QTreeWidget, QTreeWidgetItem, QFileDialog, QMessageBox,
-    QGroupBox, QCheckBox, QListWidget, QListWidgetItem, QProgressBar
+    QGroupBox, QCheckBox, QListWidget, QListWidgetItem, QProgressBar,
+    QSplitter, QGraphicsView, QGraphicsScene, QGraphicsEllipseItem,
+    QGraphicsTextItem, QGraphicsLineItem, QApplication
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QBrush, QColor, QPen
 from pathlib import Path
 import json
 import pyperclip
+import csv
+import math
 
 # Попытка импортировать core/services, иначе заглушки
 try:
@@ -87,13 +91,13 @@ class MasksTab(QWidget):
 
         self.masks_subtabs = QTabWidget()
         tab_standard = self._create_standard_masks_tab()
-        self.masks_subtabs.addTab(tab_standard, "📋 Обычный ввод")
+        self.masks_subtabs.addTab(tab_standard, "Обычный ввод")
 
         tab_xmind = self._create_xmind_reader_tab()
-        self.masks_subtabs.addTab(tab_xmind, "🌳 XMind Reader")
+        self.masks_subtabs.addTab(tab_xmind, "Карта (XMind)")
 
         tab_multiplier = self._create_multiplier_tab()
-        self.masks_subtabs.addTab(tab_multiplier, "🧬 Multiplier")
+        self.masks_subtabs.addTab(tab_multiplier, "Генератор")
 
         left_layout.addWidget(self.masks_subtabs)
         left_widget.setLayout(left_layout)
@@ -193,24 +197,38 @@ class MasksTab(QWidget):
     def _create_xmind_reader_tab(self):
         widget = QWidget()
         layout = QVBoxLayout()
+        
         btn_load = QPushButton("📂 Загрузить XMind")
         btn_load.clicked.connect(self.on_load_xmind)
         layout.addWidget(btn_load)
+        
         self.xmind_info = QLabel("🔄 Файл не загружен")
         self.xmind_info.setStyleSheet("background:#f0f0f0;padding:5px;border-radius:3px;")
         layout.addWidget(self.xmind_info)
+        
+        splitter = QSplitter(Qt.Horizontal)
+        
         self.xmind_tree = QTreeWidget()
-        self.xmind_tree.setHeaderLabels(["📌 Элемент", "🔷 Тип", "⚖️ Вес"])
+        self.xmind_tree.setHeaderLabels(["📌 Элемент", "🔷 Тип", "🏷️ Метки"])
         self.xmind_tree.setColumnCount(3)
-        layout.addWidget(self.xmind_tree)
+        splitter.addWidget(self.xmind_tree)
+        
+        self.xmind_graphics = QGraphicsView()
+        self.xmind_graphics.setMinimumWidth(400)
+        splitter.addWidget(self.xmind_graphics)
+        
+        splitter.setSizes([400, 600])
+        layout.addWidget(splitter)
+        
         ctrl = QHBoxLayout()
-        btn_send = QPushButton("➡️ Передать во множитель")
+        btn_send = QPushButton("➡️ Передать в Генератор")
         btn_send.clicked.connect(self.on_xmind_to_multiplier)
         ctrl.addWidget(btn_send)
         btn_save = QPushButton("💾 Сохранить конфиг")
         btn_save.clicked.connect(self.on_save_xmind_config)
         ctrl.addWidget(btn_save)
         layout.addLayout(ctrl)
+        
         widget.setLayout(layout)
         return widget
 
@@ -222,6 +240,7 @@ class MasksTab(QWidget):
             parser = XMindParser(path)
             self.xmind_data = parser.parse()
             self._display_xmind_tree()
+            self._render_mindmap()
             self.xmind_info.setText(f"✅ Загружено: <b>{self.xmind_data['title']}</b>")
             self.xmind_info.setStyleSheet("background:#c8e6c9;padding:5px;border-radius:3px;")
         except Exception as e:
@@ -239,19 +258,106 @@ class MasksTab(QWidget):
             return
         def add_branch_recursive(parent_item, branch_list):
             for branch in branch_list:
-                type_name = branch.get('type', 'CORE')
-                # иконки можно добавить позже через self._get_type_icon
+                type_name = branch.get('type', 'GEN')
+                labels = branch.get('labels', [])
+                labels_str = ", ".join(labels) if labels else ""
+                
                 tree_item = QTreeWidgetItem(parent_item) if parent_item else QTreeWidgetItem(self.xmind_tree)
                 tree_item.setText(0, f"{branch.get('title','')}")
                 tree_item.setText(1, type_name)
-                weight_percent = int(branch.get('weight', 1.0) * 100)
-                tree_item.setText(2, f"{weight_percent}%")
+                tree_item.setText(2, labels_str)
+                
                 children = branch.get('children', [])
                 if children:
                     add_branch_recursive(tree_item, children)
         add_branch_recursive(None, branches)
         self.xmind_tree.expandAll()
 
+    def _render_mindmap(self):
+        """Отобразить XMind карту в режиме 'центр и лучи'"""
+        if not self.xmind_data:
+            return
+        
+        scene = QGraphicsScene()
+        self.xmind_graphics.setScene(scene)
+        
+        branches = self.xmind_data.get('branches', [])
+        if not branches:
+            return
+        
+        root = branches[0] if branches else None
+        if not root:
+            return
+        
+        center_x, center_y = 0, 0
+        center_radius = 60
+        
+        center_ellipse = scene.addEllipse(
+            center_x - center_radius, 
+            center_y - center_radius,
+            center_radius * 2, 
+            center_radius * 2,
+            QPen(QColor("#3498db"), 2),
+            QBrush(QColor("#ecf0f1"))
+        )
+        
+        root_title = root.get('title', 'Root')
+        center_text = scene.addText(root_title[:20])
+        center_text.setPos(
+            center_x - center_text.boundingRect().width() / 2,
+            center_y - center_text.boundingRect().height() / 2
+        )
+        
+        children = root.get('children', [])
+        if not children:
+            return
+        
+        radius = 300
+        n = max(1, len(children))
+        
+        for i, child in enumerate(children):
+            angle = 2 * math.pi * i / n
+            x = center_x + radius * math.cos(angle)
+            y = center_y + radius * math.sin(angle)
+            
+            node_width = 140
+            node_height = 50
+            
+            node_type = child.get('type', 'GEN')
+            color_map = {
+                'CORE': '#e74c3c',
+                'COMMERCIAL': '#f39c12',
+                'INFO': '#3498db',
+                'ATTR': '#9b59b6',
+                'EXCLUDE': '#7f8c8d',
+                'GEN': '#95a5a6'
+            }
+            color = color_map.get(node_type, '#95a5a6')
+            
+            node_rect = scene.addRect(
+                x - node_width / 2,
+                y - node_height / 2,
+                node_width,
+                node_height,
+                QPen(QColor(color), 2),
+                QBrush(QColor("#ffffff"))
+            )
+            
+            line = scene.addLine(
+                center_x, center_y, x, y,
+                QPen(QColor("#bdc3c7"), 1)
+            )
+            line.setZValue(-1)
+            
+            child_title = child.get('title', '')[:25]
+            child_text = scene.addText(child_title)
+            child_text.setPos(
+                x - child_text.boundingRect().width() / 2,
+                y - child_text.boundingRect().height() / 2
+            )
+        
+        self.xmind_graphics.fitInView(scene.sceneRect(), Qt.KeepAspectRatio)
+    
     def _count_tree_items(self, branches):
         count = len(branches)
         for b in branches:
@@ -297,12 +403,15 @@ class MasksTab(QWidget):
         self.multiplier_table.setHorizontalHeaderLabels(["🔑 Маска", "🎯 Намерение", "⭐ Score", "📝 Оригинал"])
         center.addWidget(self.multiplier_table)
         export = QHBoxLayout()
-        btn_copy = QPushButton("📋 Копировать в буфер")
+        btn_copy = QPushButton("📋 Копировать")
         btn_copy.clicked.connect(self.on_multiplier_copy)
         export.addWidget(btn_copy)
-        btn_export_txt = QPushButton("💾 Экспорт TXT")
-        btn_export_txt.clicked.connect(self.on_multiplier_export_txt)
-        export.addWidget(btn_export_txt)
+        btn_export_csv = QPushButton("💾 Экспорт CSV")
+        btn_export_csv.clicked.connect(self.on_multiplier_export_csv)
+        export.addWidget(btn_export_csv)
+        btn_to_parsing = QPushButton("➡️ Передать в Парсинг")
+        btn_to_parsing.clicked.connect(self.on_multiplier_to_parsing)
+        export.addWidget(btn_to_parsing)
         center.addLayout(export)
         layout.addLayout(left, 1)
         layout.addLayout(center, 3)
@@ -331,16 +440,43 @@ class MasksTab(QWidget):
         pyperclip.copy(text)
         QMessageBox.information(self, "✅", f"Скопировано {len(self.multiplier_results)} масок")
 
-    def on_multiplier_export_txt(self):
+    def on_multiplier_export_csv(self):
+        """Экспортировать результаты в CSV файл"""
         if not self.multiplier_results:
             QMessageBox.warning(self, "⚠️", "Нет результатов для экспорта")
             return
-        path, _ = QFileDialog.getSaveFileName(self, "Сохранить маски", "", "Text (*.txt)")
-        if path:
-            with open(path, 'w', encoding='utf-8') as f:
+        
+        path, _ = QFileDialog.getSaveFileName(self, "Сохранить CSV", "", "CSV (*.csv)")
+        if not path:
+            return
+        
+        try:
+            with open(path, 'w', encoding='utf-8', newline='') as f:
+                writer = csv.writer(f, delimiter=';')
+                writer.writerow(["mask", "intent", "score"])
                 for r in self.multiplier_results:
-                    f.write(r['keyword'] + '\n')
-            QMessageBox.information(self, "✅", f"Сохранено {len(self.multiplier_results)} масок")
+                    writer.writerow([
+                        r.get('keyword', ''),
+                        r.get('intent', ''),
+                        r.get('score', 0)
+                    ])
+            QMessageBox.information(self, "✅", f"Экспортировано {len(self.multiplier_results)} масок в {path}")
+        except Exception as e:
+            QMessageBox.critical(self, "❌ Ошибка", f"Не удалось сохранить файл: {e}")
+    
+    def on_multiplier_to_parsing(self):
+        """Передать маски в вкладку Парсинг"""
+        if not self.multiplier_results:
+            QMessageBox.warning(self, "⚠️", "Нет результатов для передачи")
+            return
+        
+        masks = [r['keyword'] for r in self.multiplier_results]
+        
+        if callable(self._send_cb):
+            self._send_cb(masks)
+            QMessageBox.information(self, "✅", f"Передано {len(masks)} масок в Парсинг")
+        else:
+            QMessageBox.warning(self, "⚠️", "Функция передачи не настроена")
 
     # Вспомогательная интеграция
     def log_message(self, message: str):
