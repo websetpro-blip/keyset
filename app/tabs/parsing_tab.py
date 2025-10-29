@@ -493,7 +493,7 @@ class ParsingTab(QWidget):
         # Выпадающий виджет для кнопки "Частотка"
         self._wordstat_dropdown = None
         
-        self._init_ui()
+        self.setup_ui()
         self._wire_signals()
         self._restore_session_state()
 
@@ -663,19 +663,103 @@ class ParsingTab(QWidget):
                 self._ensure_item(row, 3 + idx)
             self._ensure_item(row, status_col)
 
-    def _init_ui(self) -> None:
-        """Инициализация UI по архитектуре Key Collector"""
-        main_layout = QVBoxLayout(self)
+    def setup_ui(self) -> None:
+        """Создание интерфейса вкладки парсинга в стиле Key Collector"""
+        from PySide6.QtWidgets import (
+            QVBoxLayout, QHBoxLayout, QSplitter, 
+            QWidget, QPushButton, QMenu
+        )
+        from PySide6.QtCore import Qt
+        
+        # ============================================
+        # 1. ВЕРХНИЙ TOOLBAR
+        # ============================================
+        toolbar = self._create_toolbar()
+        
+        # ============================================
+        # 2. ЛЕВАЯ ЧАСТЬ (таблица + журнал)
+        # ============================================
+        left_widget = QWidget()
+        left_layout = QVBoxLayout()
+        left_layout.setContentsMargins(5, 5, 5, 5)
+        left_layout.setSpacing(5)
+        
+        # Кнопки управления парсингом
+        control_buttons = QHBoxLayout()
+        self.btn_run = QPushButton("🚀 Запустить парсинг")
+        self.btn_run.setStyleSheet("QPushButton { font-weight: bold; padding: 8px; }")
+        self.btn_stop = QPushButton("⏹ Стоп")
+        self.btn_stop.setEnabled(False)
+        self.btn_pause = QPushButton("⏸ Пауза")
+        self.btn_pause.setEnabled(False)
+
+        control_buttons.addWidget(self.btn_run)
+        control_buttons.addWidget(self.btn_pause)
+        control_buttons.addWidget(self.btn_stop)
+        control_buttons.addStretch()
+
+        # Прогресс
+        self.progress = QProgressBar()
+        self.progress.setVisible(False)
+        control_buttons.addWidget(self.progress)
+
+        left_layout.addLayout(control_buttons)
+        
+        # Таблица фраз
+        self.table = QTableWidget()
+        self._configure_table_columns(self._active_regions)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        left_layout.addWidget(self.table, 1)  # растяжка = 1 (занимает всё место)
+        
+        # Журнал событий
+        if self.activity_log:
+            self.activity_log.setFixedHeight(150)  # фиксированная высота
+            left_layout.addWidget(self.activity_log, 0)  # растяжка = 0
+        
+        left_widget.setLayout(left_layout)
+        
+        # ============================================
+        # 3. ПРАВАЯ ЧАСТЬ (ТОЛЬКО группы)
+        # ============================================
+        right_widget = self._create_groups_panel()
+        
+        # ============================================
+        # 4. SPLITTER (разделитель)
+        # ============================================
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.addWidget(left_widget)   # левая часть
+        splitter.addWidget(right_widget)  # правая часть
+        
+        # Начальные размеры: 75% / 25%
+        splitter.setSizes([750, 250])
+        splitter.setStretchFactor(0, 3)  # левая растягивается больше
+        splitter.setStretchFactor(1, 1)
+        
+        # Запретить схлопывание левой части
+        splitter.setCollapsible(0, False)
+        splitter.setCollapsible(1, True)  # правую можно свернуть
+        
+        # ============================================
+        # 5. ГЛАВНЫЙ LAYOUT
+        # ============================================
+        main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
-
-        # ═══════════════════════════════════════════════════════════
-        # 1️⃣ TOP PANEL - функции вверху
-        # ═══════════════════════════════════════════════════════════
-        self.toolbar = QToolBar("Парсинг")
-        self.toolbar.setMovable(False)
-        self.toolbar.setFloatable(False)
-        self.toolbar.setContentsMargins(0, 0, 0, 0)
+        
+        main_layout.addWidget(toolbar, 0)    # toolbar сверху
+        main_layout.addWidget(splitter, 1)   # всё остальное
+        
+        self.setLayout(main_layout)
+        
+    def _create_toolbar(self) -> QToolBar:
+        """Создать верхний toolbar"""
+        toolbar = QToolBar("Парсинг")
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
+        toolbar.setContentsMargins(0, 0, 0, 0)
 
         # Кнопки основных функций
         self.btn_add = QToolButton()
@@ -740,131 +824,107 @@ class ParsingTab(QWidget):
         self.btn_export.setText("💾 Экспорт")
         self.btn_export.setToolButtonStyle(Qt.ToolButtonTextOnly)
 
-        self.toolbar.addWidget(self.btn_add)
-        self.toolbar.addWidget(self.btn_delete)
-        self.toolbar.addSeparator()
-        self.toolbar.addWidget(self.btn_selection)
-        self.toolbar.addSeparator()
-        self.toolbar.addWidget(self.btn_ws)
-        self.toolbar.addWidget(self.btn_batch)
-        self.toolbar.addWidget(self.btn_forecast)
-        self.toolbar.addSeparator()
-        self.toolbar.addWidget(self.btn_clear)
-        self.toolbar.addWidget(self.btn_export)
+        toolbar.addWidget(self.btn_add)
+        toolbar.addWidget(self.btn_delete)
+        toolbar.addSeparator()
+        toolbar.addWidget(self.btn_selection)
+        toolbar.addSeparator()
+        toolbar.addWidget(self.btn_ws)
+        toolbar.addWidget(self.btn_batch)
+        toolbar.addWidget(self.btn_forecast)
+        toolbar.addSeparator()
+        toolbar.addWidget(self.btn_clear)
+        toolbar.addWidget(self.btn_export)
 
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.toolbar.addWidget(spacer)
+        toolbar.addWidget(spacer)
 
         self.status_label = QLabel("🟢 Готово")
         self.status_label.setStyleSheet("QLabel { font-weight: bold; padding: 5px; }")
-        self.toolbar.addWidget(self.status_label)
+        toolbar.addWidget(self.status_label)
 
-        main_layout.addWidget(self.toolbar)
-
-        # ═══════════════════════════════════════════════════════════
-        # 2️⃣ ГЛАВНАЯ ОБЛАСТЬ - Горизонтальный splitter
-        # ═══════════════════════════════════════════════════════════
-        splitter_main = QSplitter(Qt.Horizontal)
-
-        # ───────────────────────────────────────────────────────────
-        # ЛЕВАЯ ЧАСТЬ (70-75%) - Таблица + Журнал
-        # ───────────────────────────────────────────────────────────
-        left_container = QWidget()
-        left_layout = QVBoxLayout(left_container)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(0)
-
-        # Кнопки управления парсингом
-        control_buttons = QHBoxLayout()
-        self.btn_run = QPushButton("🚀 Запустить парсинг")
-        self.btn_run.setStyleSheet("QPushButton { font-weight: bold; padding: 8px; }")
-        self.btn_stop = QPushButton("⏹ Стоп")
-        self.btn_stop.setEnabled(False)
-        self.btn_pause = QPushButton("⏸ Пауза")
-        self.btn_pause.setEnabled(False)
-
-        control_buttons.addWidget(self.btn_run)
-        control_buttons.addWidget(self.btn_pause)
-        control_buttons.addWidget(self.btn_stop)
-        control_buttons.addStretch()
-
-        # Прогресс
-        self.progress = QProgressBar()
-        self.progress.setVisible(False)
-        control_buttons.addWidget(self.progress)
-
-        left_layout.addLayout(control_buttons)
-
-        # ОСНОВНАЯ ТАБЛИЦА с результатами
-        self.table = QTableWidget()
-        self._configure_table_columns(self._active_regions)
-
-        self.table.verticalHeader().setVisible(False)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.NoSelection)
-        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-
-        left_layout.addWidget(self.table, 1)  # Растягивается
-
-        # ЖУРНАЛ СОБЫТИЙ внизу (если есть)
-        if self.activity_log:
-            self.activity_log.setMaximumHeight(150)
-            left_layout.addWidget(self.activity_log, 0)  # Фиксированная высота
-
-        # ───────────────────────────────────────────────────────────
-        # ПРАВАЯ ЧАСТЬ (25-30%) - Управление группами
-        # ───────────────────────────────────────────────────────────
-        right_container = QWidget()
-        right_layout = QVBoxLayout(right_container)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(0)
-
+        return toolbar
+    
+    def _create_groups_panel(self) -> QWidget:
+        """Создать панель управления группами (ЕДИНСТВЕННУЮ)"""
+        widget = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(5)
+        
+        # Заголовок
+        title = QLabel("Управление группами")
+        title.setStyleSheet("font-weight: bold; font-size: 12px;")
+        layout.addWidget(title)
+        
         # Мини-тулбар для групп
-        group_toolbar = QToolBar("Группы")
-        group_toolbar.setMovable(False)
-        self._action_create_group = group_toolbar.addAction("Создать группу", self._create_group)
-        self._action_delete_group = group_toolbar.addAction("Удалить группу", self._delete_group)
-        group_toolbar.addSeparator()
-        self._action_rename_group = group_toolbar.addAction("Переименовать", self._rename_group)
-        self._action_move_group_up = group_toolbar.addAction("Вверх", self._move_group_up)
-        self._action_move_group_down = group_toolbar.addAction("Вниз", self._move_group_down)
-        right_layout.addWidget(group_toolbar)
-
+        toolbar_layout = QHBoxLayout()
+        btn_add = QPushButton("+")
+        btn_add.setToolTip("Создать группу")
+        btn_add.setFixedSize(30, 30)
+        btn_add.clicked.connect(self._create_group)
+        
+        btn_del = QPushButton("-")
+        btn_del.setToolTip("Удалить группу")
+        btn_del.setFixedSize(30, 30)
+        btn_del.clicked.connect(self._delete_group)
+        
+        btn_rename = QPushButton("✎")
+        btn_rename.setToolTip("Переименовать")
+        btn_rename.setFixedSize(30, 30)
+        btn_rename.clicked.connect(self._rename_group)
+        
+        toolbar_layout.addWidget(btn_add)
+        toolbar_layout.addWidget(btn_del)
+        toolbar_layout.addWidget(btn_rename)
+        toolbar_layout.addStretch()
+        
+        layout.addLayout(toolbar_layout)
+        
         # Дерево групп
         self.groups_tree = QTreeWidget()
-        self.groups_tree.setHeaderLabel("Группы")
-        self.groups_tree.setContextMenuPolicy(Qt.CustomContextMenu)
-        right_layout.addWidget(self.groups_tree)
-
-        # Инициализируем дерево групп
-        self._init_groups_tree()
-
-        # ───────────────────────────────────────────────────────────
-        # Добавляем в splitter
-        # ───────────────────────────────────────────────────────────
-        splitter_main.addWidget(left_container)
-        splitter_main.addWidget(right_container)
-
-        # Начальные размеры: 750px таблица, 250px группы
-        splitter_main.setSizes([750, 250])
-
-        # Stretch factors: таблица растягивается в 3 раза больше
-        splitter_main.setStretchFactor(0, 3)
-        splitter_main.setStretchFactor(1, 1)
-
-        # Таблица НЕ сворачивается, группы можно свернуть
-        splitter_main.setCollapsible(0, False)
-        splitter_main.setCollapsible(1, True)
-
-        # Минимальные размеры
-        left_container.setMinimumWidth(400)
-        right_container.setMinimumWidth(200)
-
-        main_layout.addWidget(splitter_main)
+        self.groups_tree.setHeaderLabel("Группа / Фраза")
+        self.groups_tree.setMaximumWidth(350)
+        self.groups_tree.itemClicked.connect(self._on_group_selected)
         
+        # Загрузить существующие группы
+        self._init_groups_tree()
+        
+        layout.addWidget(self.groups_tree, 1)
+        
+        widget.setLayout(layout)
+        widget.setMaximumWidth(400)  # максимальная ширина панели
+        return widget
+    
     def _wire_signals(self):
         """Подключение сигналов"""
+        # TOP PANEL кнопки
+        self._action_add_phrases.triggered.connect(self._show_add_phrases_dialog)
+        self._action_add_from_file.triggered.connect(self._on_add_from_file)
+        self._action_add_from_clipboard.triggered.connect(self._on_add_from_clipboard)
+        self._action_clear_phrases.triggered.connect(self._on_clear_results)
+        self.btn_delete.clicked.connect(self._on_delete_phrases)
+        self.btn_ws.clicked.connect(self._on_wordstat_dropdown)
+        self.btn_batch.clicked.connect(self._on_batch_parsing)
+        self.btn_forecast.clicked.connect(self._on_forecast)
+        self.btn_clear.clicked.connect(self._on_clear_results)
+        self.btn_export.clicked.connect(self._on_export_clicked)
+        
+        # Устанавливаем иконки для кнопок
+        self.btn_ws.setIcon(icon("frequency"))
+        self.btn_batch.setIcon(icon("batch"))
+        self.btn_forecast.setIcon(icon("forecast"))
+
+        # Кнопки управления парсингом
+        self.btn_run.clicked.connect(self._on_wordstat_dropdown)
+        self.btn_stop.clicked.connect(self._on_stop_parsing)
+        self.btn_pause.clicked.connect(self._on_pause_parsing)
+    
+    def _on_group_selected(self, item, column):
+        """Обработчик выбора группы"""
+        group_name = item.text(column)
+        self._append_log(f"Выбрана группа: {group_name}")
         # TOP PANEL кнопки
         self._action_add_phrases.triggered.connect(self._show_add_phrases_dialog)
         self._action_add_from_file.triggered.connect(self._on_add_from_file)
