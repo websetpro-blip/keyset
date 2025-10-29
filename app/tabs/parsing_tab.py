@@ -30,6 +30,10 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QMenu,
     QDialog,
+    QToolBar,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QSizePolicy,
 )
 
 from threading import Event
@@ -476,7 +480,7 @@ class ParsingTab(QWidget):
         super().__init__(parent)
         self._worker = None
         self._keys_panel = keys_panel
-        self.activity_log = activity_log
+        self.activity_log = activity_log or ActivityLogWidget()
         self._last_settings = self._normalize_wordstat_settings(None)
         self._active_profiles: List[dict] = []
         self._active_phrases: List[str] = []
@@ -662,12 +666,16 @@ class ParsingTab(QWidget):
     def _init_ui(self) -> None:
         """Инициализация UI по архитектуре Key Collector"""
         main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
         # ═══════════════════════════════════════════════════════════
         # 1️⃣ TOP PANEL - функции вверху
         # ═══════════════════════════════════════════════════════════
-        top_panel = QWidget()
-        top_layout = QHBoxLayout(top_panel)
+        self.toolbar = QToolBar("Парсинг")
+        self.toolbar.setMovable(False)
+        self.toolbar.setFloatable(False)
+        self.toolbar.setContentsMargins(0, 0, 0, 0)
 
         # Кнопки основных функций
         self.btn_add = QToolButton()
@@ -681,64 +689,91 @@ class ParsingTab(QWidget):
         self._add_menu.addSeparator()
         self._action_clear_phrases = self._add_menu.addAction("Очистить таблицу")
         self.btn_add.setMenu(self._add_menu)
-        self.btn_delete = QPushButton("❌ Удалить")
-        self.btn_ws = QPushButton(" Частотка")
-        self.btn_batch = QPushButton(" Пакет")
-        self.btn_forecast = QPushButton(" Прогноз")
-        self.btn_clear = QPushButton("🗑️ Очистить")
-        self.btn_export = QPushButton("💾 Экспорт")
 
-        top_layout.addWidget(self.btn_add)
-        top_layout.addWidget(self.btn_delete)
-        top_layout.addWidget(QLabel("  |  "))
-        top_layout.addWidget(self.btn_ws)
-        top_layout.addWidget(self.btn_batch)
-        top_layout.addWidget(self.btn_forecast)
-        top_layout.addWidget(QLabel("  |  "))
-        top_layout.addWidget(self.btn_clear)
-        top_layout.addWidget(self.btn_export)
-        top_layout.addStretch()
+        self.btn_delete = QToolButton()
+        self.btn_delete.setText("❌ Удалить")
+        self.btn_delete.setToolButtonStyle(Qt.ToolButtonTextOnly)
 
-        # Статус
+        # Добавляем выпадающее меню "Выделение"
+        self.btn_selection = QToolButton()
+        self.btn_selection.setText("Выделение")
+        self.btn_selection.setPopupMode(QToolButton.InstantPopup)
+        self.btn_selection.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        self._selection_menu = QMenu(self.btn_selection)
+        self._action_select_all = self._selection_menu.addAction(
+            "Выбрать все",
+            self.select_all,
+            "Ctrl+A",
+        )
+        self._action_deselect_all = self._selection_menu.addAction(
+            "Снять выбор",
+            self.deselect_all,
+        )
+        self._action_invert_selection = self._selection_menu.addAction(
+            "Инвертировать выбор",
+            self.invert_selection,
+        )
+        self._selection_menu.addSeparator()
+        self._action_select_by_filter = self._selection_menu.addAction(
+            "Выделить по фильтру...",
+            self.select_by_filter,
+        )
+        self.btn_selection.setMenu(self._selection_menu)
+
+        self.btn_ws = QToolButton()
+        self.btn_ws.setText("Частотка")
+        self.btn_ws.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+
+        self.btn_batch = QToolButton()
+        self.btn_batch.setText("Пакет")
+        self.btn_batch.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+
+        self.btn_forecast = QToolButton()
+        self.btn_forecast.setText("Прогноз")
+        self.btn_forecast.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+
+        self.btn_clear = QToolButton()
+        self.btn_clear.setText("🗑️ Очистить")
+        self.btn_clear.setToolButtonStyle(Qt.ToolButtonTextOnly)
+
+        self.btn_export = QToolButton()
+        self.btn_export.setText("💾 Экспорт")
+        self.btn_export.setToolButtonStyle(Qt.ToolButtonTextOnly)
+
+        self.toolbar.addWidget(self.btn_add)
+        self.toolbar.addWidget(self.btn_delete)
+        self.toolbar.addSeparator()
+        self.toolbar.addWidget(self.btn_selection)
+        self.toolbar.addSeparator()
+        self.toolbar.addWidget(self.btn_ws)
+        self.toolbar.addWidget(self.btn_batch)
+        self.toolbar.addWidget(self.btn_forecast)
+        self.toolbar.addSeparator()
+        self.toolbar.addWidget(self.btn_clear)
+        self.toolbar.addWidget(self.btn_export)
+
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.toolbar.addWidget(spacer)
+
         self.status_label = QLabel("🟢 Готово")
         self.status_label.setStyleSheet("QLabel { font-weight: bold; padding: 5px; }")
-        top_layout.addWidget(self.status_label)
+        self.toolbar.addWidget(self.status_label)
 
-        main_layout.addWidget(top_panel)
+        main_layout.addWidget(self.toolbar)
 
         # ═══════════════════════════════════════════════════════════
-        # 2️⃣ ГЛАВНАЯ ОБЛАСТЬ - 3 колонки
+        # 2️⃣ ГЛАВНАЯ ОБЛАСТЬ - Горизонтальный splitter
         # ═══════════════════════════════════════════════════════════
         splitter_main = QSplitter(Qt.Horizontal)
 
         # ───────────────────────────────────────────────────────────
-        # ЛЕВАЯ КОЛОНКА (5-10%) - Управление выбором строк
+        # ЛЕВАЯ ЧАСТЬ (70-75%) - Таблица + Журнал
         # ───────────────────────────────────────────────────────────
-        left_panel = QWidget()
-        left_layout = QVBoxLayout(left_panel)
+        left_container = QWidget()
+        left_layout = QVBoxLayout(left_container)
         left_layout.setContentsMargins(0, 0, 0, 0)
-
-        # Кнопки управления выбором
-        self.btn_select_all_rows = QPushButton("✓ Выбрать все")
-        self.btn_deselect_all_rows = QPushButton("✗ Снять выбор")
-        self.btn_invert_selection = QPushButton("🔄 Инвертировать")
-
-        left_layout.addWidget(self.btn_select_all_rows)
-        left_layout.addWidget(self.btn_deselect_all_rows)
-        left_layout.addWidget(self.btn_invert_selection)
-        left_layout.addSpacing(10)
-
-        hint = QLabel("Отмечайте строки чекбоксами,\nчтобы запускать действия по выбранным фразам.")
-        hint.setWordWrap(True)
-        left_layout.addWidget(hint)
-        left_layout.addStretch()
-
-        # ───────────────────────────────────────────────────────────
-        # ЦЕНТРАЛЬНАЯ КОЛОНКА (80%) - Основная таблица
-        # ───────────────────────────────────────────────────────────
-        center_panel = QWidget()
-        center_layout = QVBoxLayout(center_panel)
-        center_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
 
         # Кнопки управления парсингом
         control_buttons = QHBoxLayout()
@@ -759,7 +794,7 @@ class ParsingTab(QWidget):
         self.progress.setVisible(False)
         control_buttons.addWidget(self.progress)
 
-        center_layout.addLayout(control_buttons)
+        left_layout.addLayout(control_buttons)
 
         # ОСНОВНАЯ ТАБЛИЦА с результатами
         self.table = QTableWidget()
@@ -770,16 +805,61 @@ class ParsingTab(QWidget):
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
-        center_layout.addWidget(self.table)
+        left_layout.addWidget(self.table, 1)  # Растягивается
 
-        # Добавляем колонки в splitter (2 колонки: левая + центральная)
-        splitter_main.addWidget(left_panel)
-        splitter_main.addWidget(center_panel)
+        # ЖУРНАЛ СОБЫТИЙ внизу (если есть)
+        if self.activity_log:
+            self.activity_log.setMaximumHeight(150)
+            left_layout.addWidget(self.activity_log, 0)  # Фиксированная высота
 
-        # Пропорции: Левая панель не растягивается, Центр растягивается
-        splitter_main.setStretchFactor(0, 0)
+        # ───────────────────────────────────────────────────────────
+        # ПРАВАЯ ЧАСТЬ (25-30%) - Управление группами
+        # ───────────────────────────────────────────────────────────
+        right_container = QWidget()
+        right_layout = QVBoxLayout(right_container)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(0)
+
+        # Мини-тулбар для групп
+        group_toolbar = QToolBar("Группы")
+        group_toolbar.setMovable(False)
+        self._action_create_group = group_toolbar.addAction("Создать группу", self._create_group)
+        self._action_delete_group = group_toolbar.addAction("Удалить группу", self._delete_group)
+        group_toolbar.addSeparator()
+        self._action_rename_group = group_toolbar.addAction("Переименовать", self._rename_group)
+        self._action_move_group_up = group_toolbar.addAction("Вверх", self._move_group_up)
+        self._action_move_group_down = group_toolbar.addAction("Вниз", self._move_group_down)
+        right_layout.addWidget(group_toolbar)
+
+        # Дерево групп
+        self.groups_tree = QTreeWidget()
+        self.groups_tree.setHeaderLabel("Группы")
+        self.groups_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        right_layout.addWidget(self.groups_tree)
+
+        # Инициализируем дерево групп
+        self._init_groups_tree()
+
+        # ───────────────────────────────────────────────────────────
+        # Добавляем в splitter
+        # ───────────────────────────────────────────────────────────
+        splitter_main.addWidget(left_container)
+        splitter_main.addWidget(right_container)
+
+        # Начальные размеры: 750px таблица, 250px группы
+        splitter_main.setSizes([750, 250])
+
+        # Stretch factors: таблица растягивается в 3 раза больше
+        splitter_main.setStretchFactor(0, 3)
         splitter_main.setStretchFactor(1, 1)
-        splitter_main.setSizes([100, 900])
+
+        # Таблица НЕ сворачивается, группы можно свернуть
+        splitter_main.setCollapsible(0, False)
+        splitter_main.setCollapsible(1, True)
+
+        # Минимальные размеры
+        left_container.setMinimumWidth(400)
+        right_container.setMinimumWidth(200)
 
         main_layout.addWidget(splitter_main)
         
@@ -791,7 +871,7 @@ class ParsingTab(QWidget):
         self._action_add_from_clipboard.triggered.connect(self._on_add_from_clipboard)
         self._action_clear_phrases.triggered.connect(self._on_clear_results)
         self.btn_delete.clicked.connect(self._on_delete_phrases)
-        self.btn_ws.clicked.connect(self._on_wordstat_dropdown)  # Частотка = выпадающее меню настроек частотности
+        self.btn_ws.clicked.connect(self._on_wordstat_dropdown)
         self.btn_batch.clicked.connect(self._on_batch_parsing)
         self.btn_forecast.clicked.connect(self._on_forecast)
         self.btn_clear.clicked.connect(self._on_clear_results)
@@ -806,13 +886,6 @@ class ParsingTab(QWidget):
         self.btn_run.clicked.connect(self._on_wordstat_dropdown)
         self.btn_stop.clicked.connect(self._on_stop_parsing)
         self.btn_pause.clicked.connect(self._on_pause_parsing)
-
-        # Левая панель - управление выбором строк
-        self.btn_select_all_rows.clicked.connect(self._select_all_rows)
-        self.btn_deselect_all_rows.clicked.connect(self._deselect_all_rows)
-        self.btn_invert_selection.clicked.connect(self._invert_selection)
-
-        # Журнал — дополнительных сигналов не требуется (кнопки внутри виджета)
 
     def _get_selected_profiles(self) -> List[dict]:
         """Получить все профили из БД (вкладка Аккаунты)"""
@@ -1127,7 +1200,7 @@ class ParsingTab(QWidget):
         return normalized_rows
 
     # ═══════════════════════════════════════════════════════════
-    # Функции управления выбором строк (левая панель)
+    # Функции управления выбором строк (меню "Выделение")
     # ═══════════════════════════════════════════════════════════
 
     def _select_all_rows(self):
@@ -1136,11 +1209,19 @@ class ParsingTab(QWidget):
             self._ensure_checkbox(row, True)
         self._append_log(f"✓ Отмечено фраз: {self.table.rowCount()}")
 
+    def select_all(self):
+        """Выбрать все строки в таблице (публичный метод)"""
+        self._select_all_rows()
+
     def _deselect_all_rows(self):
         """Снять выбор со всех строк"""
         for row in range(self.table.rowCount()):
             self._ensure_checkbox(row, False)
         self._append_log("✗ Все отметки сняты")
+
+    def deselect_all(self):
+        """Снять выбор со всех строк (публичный метод)"""
+        self._deselect_all_rows()
 
     def _invert_selection(self):
         """Инвертировать выбор строк"""
@@ -1150,6 +1231,65 @@ class ParsingTab(QWidget):
                 checkbox.setChecked(not checkbox.isChecked())
         selected = len(self._get_selected_phrases())
         self._append_log(f"🔄 Отметки инвертированы ({selected} строк)")
+
+    def invert_selection(self):
+        """Инвертировать выбор строк (публичный метод)"""
+        self._invert_selection()
+
+    def _select_by_filter(self):
+        """Выделить фразы по фильтру (заглушка для будущей функциональности)"""
+        self._append_log("ℹ️ Выделение по фильтру (в разработке)")
+
+    def select_by_filter(self):
+        """Выделить фразы по фильтру (публичный метод)"""
+        self._select_by_filter()
+
+    # ═══════════════════════════════════════════════════════════
+    # Функции управления группами (правая панель)
+    # ═══════════════════════════════════════════════════════════
+
+    def _init_groups_tree(self):
+        """Инициализация дерева групп с примерами"""
+        if not hasattr(self, "groups_tree") or self.groups_tree is None:
+            return
+        self.groups_tree.clear()
+        
+        group1 = QTreeWidgetItem(self.groups_tree, ["Группа 1"])
+        group1.setCheckState(0, Qt.Checked)
+        
+        subgroup1a = QTreeWidgetItem(group1, ["Подгруппа А"])
+        subgroup1a.setCheckState(0, Qt.Unchecked)
+        
+        subgroup1b = QTreeWidgetItem(group1, ["Подгруппа Б"])
+        subgroup1b.setCheckState(0, Qt.Unchecked)
+        
+        group2 = QTreeWidgetItem(self.groups_tree, ["Группа 2"])
+        group2.setCheckState(0, Qt.Unchecked)
+        
+        group3 = QTreeWidgetItem(self.groups_tree, ["Группа 3"])
+        group3.setCheckState(0, Qt.Unchecked)
+        
+        self.groups_tree.expandAll()
+
+    def _create_group(self):
+        """Создать новую группу (заглушка)"""
+        self._append_log("ℹ️ Создание группы (в разработке)")
+
+    def _delete_group(self):
+        """Удалить выбранную группу (заглушка)"""
+        self._append_log("ℹ️ Удаление группы (в разработке)")
+
+    def _rename_group(self):
+        """Переименовать выбранную группу (заглушка)"""
+        self._append_log("ℹ️ Переименование группы (в разработке)")
+
+    def _move_group_up(self):
+        """Переместить группу вверх (заглушка)"""
+        self._append_log("ℹ️ Перемещение группы вверх (в разработке)")
+
+    def _move_group_down(self):
+        """Переместить группу вниз (заглушка)"""
+        self._append_log("ℹ️ Перемещение группы вниз (в разработке)")
 
     # ═══════════════════════════════════════════════════════════
     # Функции TOP PANEL (основные действия)
