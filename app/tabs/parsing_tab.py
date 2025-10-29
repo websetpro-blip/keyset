@@ -11,13 +11,14 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple, Iterable, Sequence
 
 from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QGuiApplication, QTextCursor
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QGroupBox,
     QSplitter,
     QPushButton,
+    QToolButton,
     QTextEdit,
     QLabel,
     QCheckBox,
@@ -27,6 +28,8 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QAbstractItemView,
     QMessageBox,
+    QMenu,
+    QDialog,
 )
 
 from threading import Event
@@ -34,6 +37,8 @@ from threading import Event
 from ..dialogs.wordstat_settings_dialog import WordstatSettingsDialog
 from ..dialogs.wordstat_dropdown_widget import WordstatDropdownWidget
 from ..keys_panel import KeysPanel
+from ..widgets.activity_log import ActivityLogWidget
+from ...core.icons import icon
 
 try:
     from ...services.accounts import list_accounts
@@ -199,14 +204,26 @@ class SingleParsingTask:
                         self.log(f"❌ Ошибка парсинга региона {region_id}: {exc}", "ERROR")
                         continue
 
+                    status_map: Dict[str, str] = {}
+                    if hasattr(ws_results, "meta"):
+                        status_map = ws_results.meta.get("statuses") or {}
+
                     for phrase, freq in ws_results.items():
+                        raw_status = status_map.get(phrase, "OK")
+                        status_key = str(raw_status).strip().upper().replace(" ", "_")
+                        status_code = "OK" if status_key == "OK" else "NO_DATA"
+                        status_display = "No data" if status_code == "NO_DATA" else "OK"
+                        try:
+                            freq_value = int(freq)
+                        except (TypeError, ValueError):
+                            freq_value = 0
                         region_records.append(
                             {
                                 "phrase": phrase,
-                                "ws": freq,
+                                "ws": freq_value,
                                 "qws": 0,
                                 "bws": 0,
-                                "status": "OK",
+                                "status": status_display,
                                 "profile": self.profile_email,
                                 "region_id": region_id,
                                 "region_name": region_name,
@@ -465,6 +482,8 @@ class ParsingTab(QWidget):
         self._active_regions: Dict[int, str] = {225: "Россия (225)"}
         self._region_order: List[int] = []
         self._region_labels: Dict[int, str] = {}
+        self._manual_phrases_cache: str = ""
+        self._manual_ignore_duplicates: bool = False
         
         # Выпадающий виджет для кнопки "Частотка"
         self._wordstat_dropdown = None
@@ -563,6 +582,37 @@ class ParsingTab(QWidget):
         item = self._ensure_item(row, column)
         item.setText("" if text is None else str(text))
 
+    def _set_frequency_cell(
+        self,
+        row: int,
+        column: int,
+        value: Any,
+        *,
+        region_id: int | None = None,
+        status: str | None = None,
+    ) -> None:
+        freq = self._coerce_freq(value)
+        item = self._ensure_item(row, column)
+        item.setText(str(freq))
+        item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        meta = item.data(Qt.UserRole)
+        if not isinstance(meta, dict):
+            meta = {}
+        if region_id is not None:
+            meta["region_id"] = region_id
+        if status:
+            meta["status"] = status
+        meta["value"] = freq
+        item.setData(Qt.UserRole, meta)
+
+    def _set_status_cell(self, row: int, text: str, *, status_meta: dict | None = None) -> None:
+        column = self._status_column_index()
+        item = self._ensure_item(row, column)
+        item.setText(text)
+        item.setTextAlignment(Qt.AlignCenter)
+        if status_meta is not None:
+            item.setData(Qt.UserRole, status_meta)
+
     def _configure_table_columns(self, region_map: Dict[int, str] | None) -> None:
         if not hasattr(self, "table"):
             return
@@ -619,11 +669,21 @@ class ParsingTab(QWidget):
         top_layout = QHBoxLayout(top_panel)
 
         # Кнопки основных функций
-        self.btn_add = QPushButton("➕ Добавить")
+        self.btn_add = QToolButton()
+        self.btn_add.setText("➕ Добавить")
+        self.btn_add.setPopupMode(QToolButton.InstantPopup)
+        self.btn_add.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        self._add_menu = QMenu(self.btn_add)
+        self._action_add_phrases = self._add_menu.addAction("Добавить фразы…")
+        self._action_add_from_file = self._add_menu.addAction("Загрузить из файла…")
+        self._action_add_from_clipboard = self._add_menu.addAction("Импорт из буфера…")
+        self._add_menu.addSeparator()
+        self._action_clear_phrases = self._add_menu.addAction("Очистить таблицу")
+        self.btn_add.setMenu(self._add_menu)
         self.btn_delete = QPushButton("❌ Удалить")
-        self.btn_ws = QPushButton("📊 Частотка")
-        self.btn_batch = QPushButton("📦 Пакет")
-        self.btn_forecast = QPushButton("💰 Прогноз")
+        self.btn_ws = QPushButton(" Частотка")
+        self.btn_batch = QPushButton(" Пакет")
+        self.btn_forecast = QPushButton(" Прогноз")
         self.btn_clear = QPushButton("🗑️ Очистить")
         self.btn_export = QPushButton("💾 Экспорт")
 
@@ -712,15 +772,6 @@ class ParsingTab(QWidget):
 
         center_layout.addWidget(self.table)
 
-        # Поле ввода фраз (компактное, под таблицей)
-        phrases_label = QLabel("Добавить фразы:")
-        self.phrases_edit = QTextEdit()
-        self.phrases_edit.setMaximumHeight(80)
-        self.phrases_edit.setPlaceholderText("Введите фразы (каждая с новой строки)")
-
-        center_layout.addWidget(phrases_label)
-        center_layout.addWidget(self.phrases_edit)
-
         # Добавляем колонки в splitter (2 колонки: левая + центральная)
         splitter_main.addWidget(left_panel)
         splitter_main.addWidget(center_panel)
@@ -733,39 +784,27 @@ class ParsingTab(QWidget):
         # ═══════════════════════════════════════════════════════════
         # 3️⃣ BOTTOM JOURNAL - журнал внизу
         # ═══════════════════════════════════════════════════════════
-        journal_group = QGroupBox("📋 Журнал активности")
-        journal_layout = QVBoxLayout(journal_group)
-
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
-        self.log_text.setMaximumHeight(150)
-        self.log_text.setStyleSheet("""
-            QTextEdit {
-                background-color: #1e1e1e;
-                color: #00ff00;
-                font-family: 'Consolas', 'Monaco', monospace;
-                font-size: 9pt;
-            }
-        """)
-
-        journal_layout.addWidget(self.log_text)
-
-        # Кнопка очистки логов
-        self.btn_clear_log = QPushButton("Очистить журнал")
-        journal_layout.addWidget(self.btn_clear_log)
-
-        main_layout.addWidget(journal_group)
+        self.activity_log = ActivityLogWidget(self)
+        main_layout.addWidget(self.activity_log)
         
     def _wire_signals(self):
         """Подключение сигналов"""
         # TOP PANEL кнопки
-        self.btn_add.clicked.connect(self._on_add_phrases)
+        self._action_add_phrases.triggered.connect(self._show_add_phrases_dialog)
+        self._action_add_from_file.triggered.connect(self._on_add_from_file)
+        self._action_add_from_clipboard.triggered.connect(self._on_add_from_clipboard)
+        self._action_clear_phrases.triggered.connect(self._on_clear_results)
         self.btn_delete.clicked.connect(self._on_delete_phrases)
         self.btn_ws.clicked.connect(self._on_wordstat_dropdown)  # Частотка = выпадающее меню настроек частотности
         self.btn_batch.clicked.connect(self._on_batch_parsing)
         self.btn_forecast.clicked.connect(self._on_forecast)
         self.btn_clear.clicked.connect(self._on_clear_results)
         self.btn_export.clicked.connect(self._on_export_clicked)
+        
+        # Устанавливаем иконки для кнопок
+        self.btn_ws.setIcon(icon("frequency"))
+        self.btn_batch.setIcon(icon("batch"))
+        self.btn_forecast.setIcon(icon("forecast"))
 
         # Кнопки управления парсингом
         self.btn_run.clicked.connect(self._on_wordstat_dropdown)
@@ -777,9 +816,8 @@ class ParsingTab(QWidget):
         self.btn_deselect_all_rows.clicked.connect(self._deselect_all_rows)
         self.btn_invert_selection.clicked.connect(self._invert_selection)
 
-        # Журнал
-        self.btn_clear_log.clicked.connect(self.log_text.clear)
-        
+        # Журнал — дополнительных сигналов не требуется (кнопки внутри виджета)
+
     def _get_selected_profiles(self) -> List[dict]:
         """Получить все профили из БД (вкладка Аккаунты)"""
         selected = []
@@ -907,6 +945,7 @@ class ParsingTab(QWidget):
             "timestamp": datetime.now().isoformat(),
             "phrases": phrases,
             "settings": self._last_settings,
+            "manual_buffer": self._manual_phrases_cache,
         }
         if partial_results is not None:
             state["partial_results"] = partial_results
@@ -940,7 +979,13 @@ class ParsingTab(QWidget):
             for phrase in phrases:
                 self._insert_phrase_row(phrase, checked=False)
             self._renumber_rows()
-            self.phrases_edit.setPlainText("\n".join(phrases))
+            self._manual_phrases_cache = "\n".join(phrases)
+        else:
+            self._manual_phrases_cache = ""
+
+        buffer_text = state.get("manual_buffer")
+        if isinstance(buffer_text, str):
+            self._manual_phrases_cache = buffer_text
 
         partial_results = state.get("partial_results") or []
         if isinstance(partial_results, list):
@@ -984,7 +1029,7 @@ class ParsingTab(QWidget):
         """Обновить результаты в таблице (заполнить частотность и статус)."""
         normalized_rows: List[Dict[str, Any]] = []
         combined_regions = dict(self._active_regions)
-        phrase_region_values: Dict[str, Dict[int, str]] = {}
+        phrase_region_values: Dict[str, Dict[int, int]] = {}
         phrase_statuses: Dict[str, Dict[int, str]] = {}
 
         for record in rows:
@@ -1003,44 +1048,66 @@ class ParsingTab(QWidget):
                 or region_id
             )
             combined_regions.setdefault(region_id, region_name)
-            phrase_region_values.setdefault(phrase, {})[region_id] = str(record.get("ws", "") or "")
-            phrase_statuses.setdefault(phrase, {})[region_id] = str(record.get("status", "OK") or "OK")
+            freq_value = self._coerce_freq(record.get("ws"))
+            status_raw = str(record.get("status", "OK") or "OK").strip().upper().replace(" ", "_")
+            if status_raw in {"FAILED", "ERROR"}:
+                status_raw = "NO_DATA"
+            if status_raw != "NO_DATA" and status_raw != "OK":
+                status_raw = "NO_DATA"
+
+            phrase_region_values.setdefault(phrase, {})[region_id] = freq_value
+            phrase_statuses.setdefault(phrase, {})[region_id] = status_raw
 
         self._configure_table_columns(combined_regions)
         self._active_regions = dict(combined_regions)
 
-        status_col = self._status_column_index()
         for row in range(self.table.rowCount()):
             self._ensure_checkbox(row)
             phrase_item = self.table.item(row, 2)
-            if phrase_item:
-                phrase = phrase_item.text()
-                region_values = phrase_region_values.get(phrase) or {}
-                region_status_map = phrase_statuses.get(phrase) or {}
+            if not phrase_item:
+                continue
+            phrase = phrase_item.text()
+            region_values = phrase_region_values.get(phrase, {})
+            region_status_map = phrase_statuses.get(phrase, {})
 
-                if region_values:
-                    for idx, region_id in enumerate(self._region_order):
-                        if region_id in region_values:
-                            self._set_cell_text(row, 3 + idx, region_values[region_id])
-                    all_ok = all(
-                        region_status_map.get(region_id, "OK") == "OK"
-                        for region_id in region_values
-                    )
-                    status_text = "✓" if all_ok else "⚠️"
-                    self._set_cell_text(row, status_col, status_text)
-                elif self.table.item(row, status_col) is None:
-                    self._set_cell_text(row, status_col, "⏱")
+            if not region_values and not region_status_map:
+                self._set_status_cell(row, "⏱")
+                continue
+
+            has_alert = False
+            status_meta: Dict[int, str] = {}
+            for idx, region_id in enumerate(self._region_order):
+                status = region_status_map.get(region_id)
+                if status is None:
+                    status = "NO_DATA" if phrase in phrase_region_values else "OK"
+                status = str(status).strip().upper().replace(" ", "_")
+                if status in {"FAILED", "ERROR"}:
+                    status = "NO_DATA"
+                freq_value = region_values.get(region_id, 0)
+                if status == "NO_DATA":
+                    has_alert = True
+                self._set_frequency_cell(row, 3 + idx, freq_value, region_id=region_id, status=status)
+                status_meta[region_id] = status
+
+            status_text = "⚠️" if has_alert else "✓"
+            self._set_status_cell(row, status_text, status_meta=status_meta)
 
         for phrase, regions in phrase_region_values.items():
             status_map = phrase_statuses.get(phrase) or {}
-            for region_id, value in regions.items():
+            region_ids = set(regions.keys()) | set(status_map.keys())
+            for region_id in region_ids:
+                freq_value = self._coerce_freq(regions.get(region_id, 0))
+                status_value = str(status_map.get(region_id, "OK")).strip().upper().replace(" ", "_")
+                if status_value in {"FAILED", "ERROR"}:
+                    status_value = "NO_DATA"
+                status_display = "No data" if status_value == "NO_DATA" else "OK"
                 normalized_rows.append(
                     {
                         "phrase": phrase,
                         "region_id": region_id,
                         "region_name": self._region_labels.get(region_id, str(region_id)),
-                        "ws": value,
-                        "status": status_map.get(region_id, "OK"),
+                        "ws": freq_value,
+                        "status": status_display,
                     }
                 )
 
@@ -1092,21 +1159,217 @@ class ParsingTab(QWidget):
     # Функции TOP PANEL (основные действия)
     # ═══════════════════════════════════════════════════════════
 
-    def _on_add_phrases(self):
-        """Добавить фразы из поля ввода в таблицу"""
-        text = self.phrases_edit.toPlainText().strip()
+    def _show_add_phrases_dialog(self):
+        """Показать диалог добавления фраз в стиле Key Collector."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Список фраз")
+        dialog.setMinimumWidth(520)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+        hint_label = QLabel("Каждую новую фразу начинайте с новой строки.")
+        layout.addWidget(hint_label)
+
+        ignore_checkbox = QCheckBox("Не следить за наличием фразы в других группах")
+        ignore_checkbox.setChecked(self._manual_ignore_duplicates)
+        layout.addWidget(ignore_checkbox)
+
+        edit = QTextEdit(dialog)
+        edit.setPlaceholderText("Введите фразы (каждая с новой строки)")
+        edit.setFixedHeight(320)
+        if self._manual_phrases_cache:
+            edit.setPlainText(self._manual_phrases_cache)
+        layout.addWidget(edit, 1)
+
+        buttons = QHBoxLayout()
+        buttons.setSpacing(8)
+        buttons.addStretch()
+
+        btn_add = QPushButton("Добавить в таблицу", dialog)
+        btn_add.setDefault(True)
+        btn_load = QPushButton("Загрузить из файла…", dialog)
+        btn_clear = QPushButton("Очистить все списки", dialog)
+        btn_close = QPushButton("Закрыть", dialog)
+
+        buttons.addWidget(btn_add)
+        buttons.addWidget(btn_load)
+        buttons.addWidget(btn_clear)
+        buttons.addWidget(btn_close)
+        layout.addLayout(buttons)
+
+        def _apply_add():
+            text = edit.toPlainText().strip()
+            phrases = self._extract_phrases_from_text(text)
+            if not phrases:
+                self._append_log("❌ Нет фраз для добавления")
+                return
+            self._manual_ignore_duplicates = ignore_checkbox.isChecked()
+            self._manual_phrases_cache = ""
+            added = self._add_phrases_to_table(phrases, source="фраз", checked=True)
+            if added:
+                dialog.accept()
+
+        def _apply_load():
+            file_path, _ = QFileDialog.getOpenFileName(
+                dialog,
+                "Выберите файл с фразами",
+                "",
+                "Text files (*.txt);;All files (*)",
+            )
+            if not file_path:
+                return
+            path = Path(file_path)
+            try:
+                phrases = self._read_phrases_from_file(path)
+            except IOError as exc:
+                QMessageBox.warning(
+                    dialog,
+                    "Ошибка чтения файла",
+                    f"Не удалось прочитать файл:\n{path}\n\n{exc}",
+                )
+                self._append_log(f"❌ Не удалось прочитать файл с фразами: {exc}")
+                return
+
+            if not phrases:
+                QMessageBox.information(
+                    dialog,
+                    "Импорт фраз",
+                    "В выбранном файле не найдено фраз.",
+                )
+                self._append_log("❌ В выбранном файле нет фраз для добавления")
+                return
+
+            existing = edit.toPlainText().strip()
+            new_text = "\n".join(phrases)
+            if existing:
+                edit.setPlainText(f"{existing}\n{new_text}")
+            else:
+                edit.setPlainText(new_text)
+            edit.moveCursor(QTextCursor.End)
+            self._manual_phrases_cache = edit.toPlainText()
+            self._append_log(f"📂 Загружено фраз из файла: {path.name} ({len(phrases)})")
+
+        def _apply_clear():
+            edit.clear()
+            self._manual_phrases_cache = ""
+            self._append_log("🧹 Буфер ввода фраз очищен")
+
+        btn_add.clicked.connect(_apply_add)
+        btn_load.clicked.connect(_apply_load)
+        btn_clear.clicked.connect(_apply_clear)
+        btn_close.clicked.connect(dialog.reject)
+
+        result = dialog.exec()
+        if result != QDialog.Accepted:
+            self._manual_phrases_cache = edit.toPlainText()
+            self._manual_ignore_duplicates = ignore_checkbox.isChecked()
+
+    @staticmethod
+    def _extract_phrases_from_text(text: str) -> List[str]:
+        normalized: List[str] = []
         if not text:
-            self._append_log("❌ Нет фраз для добавления")
+            return normalized
+        prepared = text.replace("\r\n", "\n").replace("\r", "\n")
+        for line in prepared.split("\n"):
+            phrase = line.strip()
+            if phrase:
+                normalized.append(phrase)
+        return normalized
+
+    def _read_phrases_from_file(self, path: Path) -> List[str]:
+        """Прочитать фразы из текстового файла в кодировке UTF-8 или CP1251."""
+        try:
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                text = path.read_text(encoding="cp1251")
+        except Exception as exc:
+            raise IOError(str(exc)) from exc
+        return self._extract_phrases_from_text(text)
+
+    def _add_phrases_to_table(
+        self,
+        phrases: Iterable[str],
+        *,
+        source: str = "фраз",
+        checked: bool = True,
+    ) -> int:
+        normalized: List[str] = []
+        for phrase in phrases:
+            phrase_text = str(phrase).strip()
+            if not phrase_text:
+                continue
+            normalized.append(phrase_text)
+
+        if not normalized:
+            return 0
+
+        for phrase in normalized:
+            self._insert_phrase_row(phrase, checked=checked)
+
+        self._renumber_rows()
+        source_label = source or "фраз"
+        self._append_log(
+            f"➕ Добавлено {source_label}: {len(normalized)} (всего: {self.table.rowCount()})"
+        )
+        return len(normalized)
+
+    def _on_add_from_clipboard(self) -> None:
+        """Добавить фразы из буфера обмена."""
+        clipboard = QGuiApplication.clipboard()
+        if clipboard is None:
+            self._append_log("❌ Буфер обмена недоступен")
             return
 
-        phrases = [line.strip() for line in text.splitlines() if line.strip()]
+        text = clipboard.text() or ""
+        phrases = self._extract_phrases_from_text(text)
+        if not phrases:
+            self._append_log("❌ В буфере обмена нет фраз для добавления")
+            return
 
-        for phrase in phrases:
-            self._insert_phrase_row(phrase, checked=True)
+        self._manual_phrases_cache = "\n".join(phrases)
+        self._add_phrases_to_table(phrases, source="фраз из буфера", checked=True)
 
-        self.phrases_edit.clear()
-        self._renumber_rows()
-        self._append_log(f"➕ Добавлено фраз: {len(phrases)} (всего: {self.table.rowCount()})")
+    def _on_add_from_file(self) -> None:
+        """Добавить фразы из текстового файла."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Выберите файл с фразами",
+            "",
+            "Text files (*.txt);;All files (*)",
+        )
+        if not file_path:
+            return
+
+        path = Path(file_path)
+        try:
+            phrases = self._read_phrases_from_file(path)
+        except IOError as exc:
+            QMessageBox.warning(
+                self,
+                "Ошибка чтения файла",
+                f"Не удалось прочитать файл:\n{path}\n\n{exc}",
+            )
+            self._append_log(f"❌ Не удалось прочитать файл с фразами: {exc}")
+            return
+
+        if not phrases:
+            QMessageBox.information(
+                self,
+                "Импорт фраз",
+                "В выбранном файле не найдено фраз.",
+            )
+            self._append_log("❌ В выбранном файле нет фраз для добавления")
+            return
+
+        self._manual_phrases_cache = "\n".join(phrases)
+        self._add_phrases_to_table(
+            phrases,
+            source=f"фраз из файла {path.name}",
+            checked=True,
+        )
 
     def _on_delete_phrases(self):
         """Удалить выбранные фразы из таблицы"""
@@ -1412,16 +1675,14 @@ class ParsingTab(QWidget):
             self._append_log("⏸ Парсинг поставлен на паузу")
         
     def _append_log(self, message: str):
-        """Добавить сообщение в журнал активности"""
-        self.log_text.append(message)
-        # Автопрокрутка вниз
-        scrollbar = self.log_text.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
+        """Добавить сообщение в журнал активности."""
+        if hasattr(self, "activity_log") and self.activity_log is not None:
+            self.activity_log.append_line(message)
         
     def _on_profile_log(self, profile_email: str, message: str):
-        """Обработка лога от конкретного профиля"""
-        # Можно добавить цветовое выделение для разных профилей
-        pass
+        """Обработка лога от конкретного профиля."""
+        prefix = f"[{profile_email}] " if profile_email else ""
+        self._append_log(prefix + message)
         
     def _on_progress_update(self, progress_data: dict):
         """Обновление прогресса"""

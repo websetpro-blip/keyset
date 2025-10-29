@@ -14,6 +14,7 @@ import time
 import sys
 from datetime import datetime
 from typing import Dict, Iterable, List, Optional, Any
+from urllib.parse import quote
 import logging
 
 LOG_DIR = pathlib.Path(__file__).resolve().parent / "logs"
@@ -67,10 +68,13 @@ BATCH_SIZE = 50  # Размер батча фраз
 DELAY_BETWEEN_TABS = 0.3  # Задержка между загрузкой вкладок (сек)
 DELAY_BETWEEN_QUERIES = 0.5  # Задержка между запросами (сек)
 RESPONSE_TIMEOUT = 3000  # Таймаут ожидания ответа API (мс)
-RESPONSE_WAIT_TIMEOUT = 10.0  # Максимальное ожидание ответа Wordstat (сек)
 WORDSTAT_LOAD_TIMEOUT_MS = 30000  # Таймаут загрузки Wordstat (мс)
 WORDSTAT_MAX_ATTEMPTS = 3  # Количество попыток загрузки вкладки
 WORDSTAT_RETRY_DELAY_BASE = 1.5  # Базовая задержка между повторными попытками (сек)
+PHRASE_MAX_ATTEMPTS = 3  # Сколько раз пытаемся получить частотность
+API_MAX_WAIT_SECONDS = 5.0  # Максимальное время ожидания ответа API на попытку
+API_POLL_INTERVAL = 0.2  # Интервал проверки ответа API (сек)
+RELOAD_DELAY_SECONDS = 0.5  # Пауза после перезагрузки перед новой попыткой
 
 
 def log_parsing_debug(entry: Dict[str, Any]) -> None:
@@ -95,6 +99,14 @@ def log_parsing_debug(entry: Dict[str, Any]) -> None:
             f.write(json.dumps(entry, ensure_ascii=False) + '\n')
     except Exception as e:
         logging.error(f"Ошибка записи debug лога: {e}")
+
+
+class WordstatResult(dict):
+    """Расширенный dict с метаданными по фразам."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.meta: Dict[str, Any] = {}
 
 
 def parse_proxy_fallback(uri: str) -> Optional[dict]:
@@ -307,40 +319,55 @@ class TurboParser:
         self.phrases = phrases
         self.headless = headless
         self.proxy_uri = proxy_uri
+        self.waiters: Dict[str, asyncio.Future[int]] = {}
         self.region_id: int = 225
         self.results: Dict[str, Any] = {}
+        self.result_status: Dict[str, str] = {}
         self.logger = logging.getLogger(f"TurboParser.{account_name}")
 
-    def _inject_region_into_payload(self, payload: Any) -> None:
+    def _inject_region_into_payload(self, payload: Any) -> Dict[str, Any] | None:
         """
-        Рекурсивно проталкиваем выбранный region_id в известные ключи запроса Wordstat,
-        чтобы API гарантированно работало по нужному GEO.
+        Аккуратно подставляем region_id во входной JSON Wordstat, не ломая структуру.
+        Возвращает модифицированный словарь (или None, если изменить нечего).
         """
 
-        region_id = self.region_id
+        if not isinstance(payload, dict):
+            return None
 
-        def _apply(node: Any) -> None:
-            if isinstance(node, dict):
-                for key in ("lr", "region", "regionId", "geoId"):
-                    if key in node and not isinstance(node[key], (dict, list)):
-                        node[key] = region_id
-                for key in ("regions", "regionIds", "geoIds"):
-                    if key in node and isinstance(node[key], list):
-                        node[key] = [region_id]
-                for value in node.values():
-                    _apply(value)
-            elif isinstance(node, list):
-                for item in node:
-                    _apply(item)
+        region_id = int(self.region_id)
+        changed = False
 
-        _apply(payload)
-        if isinstance(payload, dict):
-            payload.setdefault("regions", [region_id])
-            payload.setdefault("regionId", region_id)
-            payload.setdefault("lr", region_id)
+        for key in ("lr", "region", "regionId", "geoId"):
+            if key in payload and payload.get(key) != region_id:
+                payload[key] = region_id
+                changed = True
+
+        for key in ("regions", "regionIds", "geoIds"):
+            if key in payload and isinstance(payload[key], list):
+                new_value = [region_id]
+                if payload[key] != new_value:
+                    payload[key] = new_value
+                    changed = True
+
+        if "lr" not in payload:
+            payload["lr"] = region_id
+            changed = True
+        if "region" not in payload:
+            payload["region"] = region_id
+            changed = True
+
+        if changed:
+            self.logger.debug(
+                f"[Route] region payload patched: lr={payload.get('lr')}, region={payload.get('region')}"
+            )
+
+        return payload if changed else None
         
-    async def run(self) -> Dict[str, Any]:
+    async def run(self) -> WordstatResult:
         """Запуск парсера"""
+        self.results = {}
+        self.result_status = {}
+        self.waiters.clear()
         total_phrases = len(self.phrases)
         unique_phrases = len(set(self.phrases))
         duplicates_count = total_phrases - unique_phrases
@@ -364,7 +391,6 @@ class TurboParser:
         if proxy_config:
             self.logger.info(f"[PROXY] Используется: {proxy_config['server']}")
         
-        results_lock = asyncio.Lock()
         
         async with async_playwright() as p:
             # 1. ЗАПУСК CHROME
@@ -397,12 +423,12 @@ class TurboParser:
                     if post_data:
                         try:
                             payload = json.loads(post_data)
-                        except Exception:
-                            payload = None
-                        if isinstance(payload, dict):
-                            self._inject_region_into_payload(payload)
-                            await route.continue_(post_data=json.dumps(payload, ensure_ascii=False))
-                            return
+                            mutated = self._inject_region_into_payload(payload)
+                            if mutated is not None:
+                                await route.continue_(post_data=json.dumps(payload, ensure_ascii=False))
+                                return
+                        except Exception as exc:
+                            self.logger.debug(f"[Route] region patch skipped: {exc}")
                 await route.continue_()
 
             await context.route("**/wordstat/api/**", _enforce_region)
@@ -562,9 +588,12 @@ class TurboParser:
                         or 0
                     )
                     if phrase:
-                        async with results_lock:
-                            self.results[phrase] = freq
-                            self.logger.debug(f"  [API] '{phrase}' = {freq}")
+                        value = int(freq) if isinstance(freq, (int, float)) else 0
+                        waiter = self.waiters.get(phrase)
+                        if waiter and not waiter.done():
+                            waiter.set_result(value)
+                        self.results[phrase] = value
+                        self.logger.debug(f"  [API] '{phrase}' = {value}")
 
                         # ЛОГ: API ответ получен
                         api_log_entry = {
@@ -610,207 +639,139 @@ class TurboParser:
                 tab_phrases: List[str],
                 tab_index: int,
             ):
+                loop = asyncio.get_running_loop()
+
                 for index, phrase in enumerate(tab_phrases, start=1):
+                    phrase = phrase.strip()
+                    if not phrase:
+                        continue
                     if phrase in self.results:
                         continue
 
-                    # Инициализируем debug лог для фразы
-                    log_entry = {
+                    phrase_log = {
                         'timestamp': datetime.now().isoformat(),
                         'account': self.account_name,
                         'tab': tab_index + 1,
                         'phrase': phrase,
                         'status': 'started',
-                        'message': f'[TAB {tab_index + 1}] Начало парсинга: "{phrase}"'
+                        'message': f'[TAB {tab_index + 1}] Начало парсинга: "{phrase}"',
                     }
-                    log_parsing_debug(log_entry)
+                    log_parsing_debug(phrase_log)
 
-                    while True:
-                        try:
-                            input_selectors = [
-                                "input[name='text']",
-                                "input[placeholder]",
-                                ".b-form-input__input",
-                            ]
-                            self.logger.info(
-                                f"  [TAB {tab_index + 1}] ▶️ [{index}/{len(tab_phrases)}] '{phrase}'"
+                    phrase_started = time.time()
+                    success = False
+                    value = 0
+
+                    for attempt in range(1, PHRASE_MAX_ATTEMPTS + 1):
+                        if attempt > 1:
+                            self.logger.warning(
+                                f"  [TAB {tab_index + 1}] ↻ попытка {attempt}/{PHRASE_MAX_ATTEMPTS} для '{phrase}'"
                             )
-                            self.logger.debug(
-                                f"  [TAB {tab_index + 1}] Ищу поле ввода среди {len(input_selectors)} селекторов"
-                            )
-
-                            # ЛОГ: Поиск поля ввода
-                            t_input_start = time.time()
-                            input_field = None
-                            for selector in input_selectors:
-                                try:
-                                    locator = page.locator(selector)
-                                    if await locator.count() > 0:
-                                        input_field = locator.first
-                                        elapsed_input = time.time() - t_input_start
-                                        log_entry.update({
-                                            'timestamp': datetime.now().isoformat(),
-                                            'status': 'input_found',
-                                            'message': f'Поле ввода найдено: {selector}',
-                                            'selector': selector,
-                                            'elapsed': round(elapsed_input, 3)
-                                        })
-                                        log_parsing_debug(log_entry)
-                                        break
-                                except Exception:
-                                    continue
-
-                            if not input_field:
-                                self.logger.warning(
-                                    f"  [TAB {tab_index + 1}] ⚠️ Поле ввода не найдено для '{phrase}'"
-                                )
-                                # ЛОГ: Поле ввода не найдено
-                                log_entry.update({
-                                    'timestamp': datetime.now().isoformat(),
-                                    'status': 'error_no_input',
-                                    'message': 'Поле ввода НЕ НАЙДЕНО',
-                                    'ws': 0
-                                })
-                                log_parsing_debug(log_entry)
-                                async with stats_lock:
-                                    stats["errors"] += 1
-                                async with results_lock:
-                                    self.results.setdefault(phrase, 0)
-                                break
-                            
-                            self.logger.debug(
-                                f"  [TAB {tab_index + 1}] ✓ Поле ввода найдено"
-                            )
-
-                            # ЛОГ: Ввод фразы
-                            t_type_start = time.time()
-                            await input_field.clear()
-                            self.logger.debug(
-                                f"  [TAB {tab_index + 1}] Поле очищено, ввожу фразу"
-                            )
-                            await input_field.fill(phrase)
-                            elapsed_type = time.time() - t_type_start
-                            log_entry.update({
-                                'timestamp': datetime.now().isoformat(),
-                                'status': 'phrase_typed',
-                                'message': 'Фраза введена в поле',
-                                'elapsed': round(elapsed_type, 3)
-                            })
-                            log_parsing_debug(log_entry)
-
-                            # ЛОГ: Нажатие Enter и отправка запроса
-                            self.logger.debug(
-                                f"  [TAB {tab_index + 1}] Отправляю запрос на Wordstat"
-                            )
-                            t_enter_start = time.time()
-                            await input_field.press("Enter")
-                            elapsed_enter = time.time() - t_enter_start
-                            log_entry.update({
-                                'timestamp': datetime.now().isoformat(),
-                                'status': 'enter_pressed',
-                                'message': f'Enter нажат, запрос отправлен',
-                                'elapsed': round(elapsed_enter, 3)
-                            })
-                            log_parsing_debug(log_entry)
-
-                            # ЛОГ: Ожидание API ответа
-                            timeout = max(RESPONSE_WAIT_TIMEOUT, RESPONSE_TIMEOUT / 1000.0)
-                            t_api_start = time.time()
-                            response_received = False
-
-                            log_entry.update({
-                                'timestamp': datetime.now().isoformat(),
-                                'status': 'api_waiting',
-                                'message': f'Ожидание API ответа (timeout={timeout:.1f}s)'
-                            })
-                            log_parsing_debug(log_entry)
-
-                            while time.time() - t_api_start < timeout:
-                                async with results_lock:
-                                    if phrase in self.results:
-                                        response_received = True
-                                        break
-                                await asyncio.sleep(0.1)
-
-                            elapsed_api = time.time() - t_api_start
-
-                            if response_received:
-                                value = self.results.get(phrase)
-                                self.logger.info(
-                                    f"  [TAB {tab_index + 1}] ✓ '{phrase}' = {value}"
-                                )
-
-                                # ЛОГ: Успешное получение результата
-                                log_entry.update({
-                                    'timestamp': datetime.now().isoformat(),
-                                    'status': 'success',
-                                    'message': f'Частотность получена: {value}',
-                                    'ws': value,
-                                    'elapsed': round(elapsed_api, 3),
-                                    'api_received': True
-                                })
-                                log_parsing_debug(log_entry)
-
-                                async with stats_lock:
-                                    stats["processed"] += 1
-                            else:
-                                self.logger.warning(
-                                    f"  [TAB {tab_index + 1}] ⏱ '{phrase}' — timeout"
-                                )
-
-                                # ЛОГ: Таймаут API
-                                log_entry.update({
-                                    'timestamp': datetime.now().isoformat(),
-                                    'status': 'api_timeout',
-                                    'message': f'API таймаут после {elapsed_api:.2f}s ожидания',
-                                    'ws': 0,
-                                    'elapsed': round(elapsed_api, 3),
-                                    'api_received': False
-                                })
-                                log_parsing_debug(log_entry)
-
-                                async with results_lock:
-                                    self.results[phrase] = 0
+                            try:
+                                await page.reload(wait_until="domcontentloaded", timeout=WORDSTAT_LOAD_TIMEOUT_MS)
+                            except Exception as reload_exc:
                                 self.logger.debug(
-                                    f"  [TAB {tab_index + 1}] размещено значение 0 для '{phrase}' после {timeout:.1f}с ожидания"
+                                    f"  [TAB {tab_index + 1}] Ошибка reload: {reload_exc}"
                                 )
-                                async with stats_lock:
-                                    stats["processed"] += 1
-                                    stats["timeouts"] += 1
-                            
-                            async with stats_lock:
-                                processed_so_far = stats["processed"]
-                                timeouts_so_far = stats["timeouts"]
-                                errors_so_far = stats["errors"]
-                            self.logger.debug(
-                                f"  [TAB {tab_index + 1}] ✓ Завершена обработка '{phrase}' "
-                                f"(обработано: {processed_so_far}, таймаутов: {timeouts_so_far}, ошибок: {errors_so_far}, всего результатов: {len(self.results)})"
+                            await asyncio.sleep(RELOAD_DELAY_SECONDS)
+
+                        self.waiters.pop(phrase, None)
+                        self.results.pop(phrase, None)
+                        self.result_status.pop(phrase, None)
+
+                        url = (
+                            "https://wordstat.yandex.ru/"
+                            f"?words={quote(phrase)}&region={self.region_id}&lr={self.region_id}"
+                        )
+                        try:
+                            await page.goto(url, wait_until="domcontentloaded", timeout=WORDSTAT_LOAD_TIMEOUT_MS)
+                        except Exception as nav_exc:
+                            self.logger.warning(
+                                f"  [TAB {tab_index + 1}] Навигация не удалась для '{phrase}': {nav_exc}"
                             )
+                            if attempt >= PHRASE_MAX_ATTEMPTS:
+                                break
+                            await asyncio.sleep(RELOAD_DELAY_SECONDS)
+                            continue
+
+                        future: asyncio.Future[int] = loop.create_future()
+                        self.waiters[phrase] = future
+
+                        try:
+                            input_field = await page.wait_for_selector(
+                                "input[name='text'], input[placeholder], .b-form-input__input",
+                                timeout=1500,
+                            )
+                            try:
+                                await input_field.fill(phrase)
+                                await input_field.press("Enter")
+                            except Exception:
+                                pass
+                        except Exception:
+                            # Если поле не найдено — Wordstat уже обработал words в URL
+                            pass
+
+                        try:
+                            value = await asyncio.wait_for(future, timeout=API_MAX_WAIT_SECONDS)
+                            success = True
                             break
-
-                        except Exception as e:
-                            self.logger.error(
-                                f"  [TAB {tab_index + 1}] ❌ Ошибка обработке '{phrase}': {type(e).__name__}: {e}"
+                        except asyncio.TimeoutError:
+                            self.logger.warning(
+                                f"  [TAB {tab_index + 1}] ⏱ '{phrase}' нет ответа за {API_MAX_WAIT_SECONDS:.1f}s (попытка {attempt})"
                             )
-
-                            # ЛОГ: Критическая ошибка
-                            log_entry.update({
-                                'timestamp': datetime.now().isoformat(),
-                                'status': 'critical_error',
-                                'message': f'КРИТИЧЕСКАЯ ОШИБКА: {type(e).__name__}',
-                                'ws': 0,
-                                'error': str(e)[:200]
-                            })
-                            log_parsing_debug(log_entry)
-
+                        except Exception as wait_exc:
+                            self.logger.error(
+                                f"  [TAB {tab_index + 1}] ❌ Ошибка ожидания для '{phrase}' (попытка {attempt}): {wait_exc}"
+                            )
                             async with stats_lock:
                                 stats["errors"] += 1
-                            async with results_lock:
-                                self.results[phrase] = 0
-                            break
-                        
-                        await asyncio.sleep(DELAY_BETWEEN_QUERIES)
-            
+                        finally:
+                            stored_future = self.waiters.get(phrase)
+                            if stored_future is future:
+                                self.waiters.pop(phrase, None)
+                            if not future.done():
+                                future.cancel()
+
+                        if attempt < PHRASE_MAX_ATTEMPTS:
+                            await asyncio.sleep(RELOAD_DELAY_SECONDS)
+
+                    elapsed_phrase = time.time() - phrase_started
+                    existing_value = self.results.get(phrase)
+                    final_value = int(existing_value if existing_value is not None else value or 0)
+
+                    if success:
+                        self.results[phrase] = final_value
+                        self.result_status[phrase] = "OK"
+                        async with stats_lock:
+                            stats["processed"] += 1
+                        self.logger.info(
+                            f"  [TAB {tab_index + 1}] ✅ '{phrase}' = {final_value} за {elapsed_phrase:.2f}s"
+                        )
+                        phrase_log.update({
+                            'timestamp': datetime.now().isoformat(),
+                            'status': 'success',
+                            'message': f'Фраза собрана: {final_value}',
+                            'ws': final_value,
+                            'elapsed': round(elapsed_phrase, 3),
+                        })
+                        log_parsing_debug(phrase_log)
+                    else:
+                        self.results[phrase] = final_value
+                        self.result_status[phrase] = "NO_DATA"
+                        async with stats_lock:
+                            stats["processed"] += 1
+                            stats["timeouts"] += 1
+                        self.logger.warning(
+                            f"  [TAB {tab_index + 1}] ⚠️ '{phrase}' не получена, ставим {final_value} (за {elapsed_phrase:.2f}s)"
+                        )
+                        phrase_log.update({
+                            'timestamp': datetime.now().isoformat(),
+                            'status': 'no_data',
+                            'message': f'После {PHRASE_MAX_ATTEMPTS} попыток результат не получен',
+                            'ws': final_value,
+                            'elapsed': round(elapsed_phrase, 3),
+                        })
+                        log_parsing_debug(phrase_log)
             # Распределяем фразы по вкладкам
             tab_phrases_list = []
             for i in range(len(working_pages)):
@@ -824,6 +785,7 @@ class TurboParser:
                 for i, (page, phrases) in enumerate(zip(working_pages, tab_phrases_list))
             ]
             await asyncio.gather(*parse_tasks)
+            self.waiters.clear()
 
             await save_cookies_to_db(self.account_name, context, self.logger)
             
@@ -853,7 +815,12 @@ class TurboParser:
             self.logger.info(f"Скорость: {speed:.1f} фраз/сек")
             self.logger.info("=" * 70)
             
-            return self.results
+            result = WordstatResult(self.results)
+            result.meta = {
+                "statuses": dict(self.result_status),
+                "no_data": [phrase for phrase, status in self.result_status.items() if status == "NO_DATA"],
+            }
+            return result
 
 
 async def turbo_parser_10tabs(
@@ -864,7 +831,7 @@ async def turbo_parser_10tabs(
     headless: bool = False,
     proxy_uri: Optional[str] = None,
     region_id: int = 225,
-) -> Dict[str, Any]:
+) -> WordstatResult:
     """
     Главная функция парсера для обратной совместимости
     
