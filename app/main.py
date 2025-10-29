@@ -198,6 +198,7 @@ class MainWindow(QMainWindow):
 
         self._apply_qss()
         self._connect_signals()
+        self._setup_tab_switching()
         self.log_event("Приложение запущено")
 
     @staticmethod
@@ -315,6 +316,21 @@ class MainWindow(QMainWindow):
                 self.accounts.accounts_changed.connect(self.parsing.refresh_profiles)  # type: ignore[attr-defined]
             except Exception:
                 pass
+
+    def _setup_tab_switching(self) -> None:
+        """Настроить поведение при переключении вкладок"""
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+        self._on_tab_changed(self.tabs.currentIndex())
+
+    def _on_tab_changed(self, index: int) -> None:
+        """Обработчик переключения вкладок - скрывает KeysPanel для вкладки Парсинг"""
+        current_widget = self.tabs.widget(index)
+        
+        # Скрываем KeysPanel если открыта вкладка Парсинг (т.к. у неё свой внутренний панель групп)
+        if hasattr(self, 'parsing') and current_widget == self.parsing:
+            self.keys_panel.hide()
+        else:
+            self.keys_panel.show()
 
     def _push_to_parsing(self, phrases: list[str]) -> None:
         if hasattr(self.parsing, "append_phrases"):
