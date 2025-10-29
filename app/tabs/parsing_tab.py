@@ -860,24 +860,25 @@ class ParsingTab(QWidget):
         
         # Мини-тулбар для групп
         toolbar_layout = QHBoxLayout()
-        btn_add = QPushButton("+")
-        btn_add.setToolTip("Создать группу")
-        btn_add.setFixedSize(30, 30)
-        btn_add.clicked.connect(self._create_group)
         
-        btn_del = QPushButton("-")
-        btn_del.setToolTip("Удалить группу")
-        btn_del.setFixedSize(30, 30)
-        btn_del.clicked.connect(self._delete_group)
+        self.btn_add_group = QPushButton("+")
+        self.btn_add_group.setToolTip("Создать группу")
+        self.btn_add_group.setFixedSize(30, 30)
+        self.btn_add_group.clicked.connect(self._create_group)
         
-        btn_rename = QPushButton("✎")
-        btn_rename.setToolTip("Переименовать")
-        btn_rename.setFixedSize(30, 30)
-        btn_rename.clicked.connect(self._rename_group)
+        self.btn_delete_group = QPushButton("-")
+        self.btn_delete_group.setToolTip("Удалить группу")
+        self.btn_delete_group.setFixedSize(30, 30)
+        self.btn_delete_group.clicked.connect(self._delete_group)
         
-        toolbar_layout.addWidget(btn_add)
-        toolbar_layout.addWidget(btn_del)
-        toolbar_layout.addWidget(btn_rename)
+        self.btn_sort_group = QPushButton("S")
+        self.btn_sort_group.setToolTip("Сортировать")
+        self.btn_sort_group.setFixedSize(30, 30)
+        self.btn_sort_group.clicked.connect(self._on_sort_groups)
+        
+        toolbar_layout.addWidget(self.btn_add_group)
+        toolbar_layout.addWidget(self.btn_delete_group)
+        toolbar_layout.addWidget(self.btn_sort_group)
         toolbar_layout.addStretch()
         
         layout.addLayout(toolbar_layout)
@@ -886,7 +887,10 @@ class ParsingTab(QWidget):
         self.groups_tree = QTreeWidget()
         self.groups_tree.setHeaderLabel("Группа / Фраза")
         self.groups_tree.setMaximumWidth(350)
+        self.groups_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.groups_tree.customContextMenuRequested.connect(self._on_groups_context_menu)
         self.groups_tree.itemClicked.connect(self._on_group_selected)
+        self.groups_tree.itemDoubleClicked.connect(self._on_group_double_clicked)
         
         # Загрузить существующие группы
         self._init_groups_tree()
@@ -1293,34 +1297,247 @@ class ParsingTab(QWidget):
             return
         self.groups_tree.clear()
         
-        group1 = QTreeWidgetItem(self.groups_tree, ["Группа 1"])
-        group1.setCheckState(0, Qt.Checked)
+        # Инициализируем структуру данных для групп если её нет
+        if not hasattr(self, 'groups_data'):
+            self.groups_data = [
+                {
+                    "id": 1,
+                    "name": "Группа 1",
+                    "children": [
+                        {"id": 11, "name": "Подгруппа А"},
+                        {"id": 12, "name": "Подгруппа Б"}
+                    ]
+                },
+                {"id": 2, "name": "Группа 2", "children": []},
+                {"id": 3, "name": "Группа 3", "children": []},
+            ]
         
-        subgroup1a = QTreeWidgetItem(group1, ["Подгруппа А"])
-        subgroup1a.setCheckState(0, Qt.Unchecked)
+        self._load_groups()
+
+    def _load_groups(self):
+        """Загрузить группы из данных"""
+        if not hasattr(self, "groups_tree") or self.groups_tree is None:
+            return
+            
+        self.groups_tree.clear()
         
-        subgroup1b = QTreeWidgetItem(group1, ["Подгруппа Б"])
-        subgroup1b.setCheckState(0, Qt.Unchecked)
+        if not hasattr(self, 'groups_data'):
+            self.groups_data = []
         
-        group2 = QTreeWidgetItem(self.groups_tree, ["Группа 2"])
-        group2.setCheckState(0, Qt.Unchecked)
-        
-        group3 = QTreeWidgetItem(self.groups_tree, ["Группа 3"])
-        group3.setCheckState(0, Qt.Unchecked)
+        for group_data in self.groups_data:
+            parent = QTreeWidgetItem([group_data["name"]])
+            parent.setData(0, Qt.UserRole, group_data["id"])
+            parent.setCheckState(0, Qt.Unchecked)
+            self.groups_tree.addTopLevelItem(parent)
+            
+            for child_data in group_data.get("children", []):
+                child = QTreeWidgetItem([child_data["name"]])
+                child.setData(0, Qt.UserRole, child_data["id"])
+                child.setCheckState(0, Qt.Unchecked)
+                parent.addChild(child)
         
         self.groups_tree.expandAll()
 
+    def _save_groups(self):
+        """Сохранить структуру групп в данные"""
+        if not hasattr(self, "groups_tree") or self.groups_tree is None:
+            return
+            
+        self.groups_data = []
+        
+        for i in range(self.groups_tree.topLevelItemCount()):
+            parent_item = self.groups_tree.topLevelItem(i)
+            
+            group = {
+                "id": parent_item.data(0, Qt.UserRole),
+                "name": parent_item.text(0),
+                "children": []
+            }
+            
+            for j in range(parent_item.childCount()):
+                child_item = parent_item.child(j)
+                group["children"].append({
+                    "id": child_item.data(0, Qt.UserRole),
+                    "name": child_item.text(0)
+                })
+            
+            self.groups_data.append(group)
+
+    def _get_next_group_id(self) -> int:
+        """Получить следующий ID для группы"""
+        if not hasattr(self, 'groups_data'):
+            return 1
+            
+        max_id = 0
+        for group in self.groups_data:
+            if group["id"] > max_id:
+                max_id = group["id"]
+            for child in group.get("children", []):
+                if child["id"] > max_id:
+                    max_id = child["id"]
+        return max_id + 1
+
     def _create_group(self):
-        """Создать новую группу (заглушка)"""
-        self._append_log("ℹ️ Создание группы (в разработке)")
+        """Создать новую группу"""
+        from PySide6.QtWidgets import QInputDialog
+        
+        if not hasattr(self, "groups_tree") or self.groups_tree is None:
+            self._append_log("❌ Дерево групп не инициализировано")
+            return
+        
+        name, ok = QInputDialog.getText(
+            self,
+            "Создать группу",
+            "Введите название группы:"
+        )
+        
+        if not ok or not name.strip():
+            return
+        
+        selected_items = self.groups_tree.selectedItems()
+        parent_item = selected_items[0] if selected_items else None
+        
+        new_item = QTreeWidgetItem([name.strip()])
+        new_group_id = self._get_next_group_id()
+        new_item.setData(0, Qt.UserRole, new_group_id)
+        new_item.setCheckState(0, Qt.Unchecked)
+        
+        if parent_item:
+            parent_item.addChild(new_item)
+            parent_item.setExpanded(True)
+        else:
+            self.groups_tree.addTopLevelItem(new_item)
+        
+        self._save_groups()
+        self._append_log(f"✅ Создана группа: {name.strip()}")
+        
+        QMessageBox.information(self, "Готово", f"Группа '{name.strip()}' создана!")
 
     def _delete_group(self):
-        """Удалить выбранную группу (заглушка)"""
-        self._append_log("ℹ️ Удаление группы (в разработке)")
+        """Удалить выбранную группу"""
+        if not hasattr(self, "groups_tree") or self.groups_tree is None:
+            self._append_log("❌ Дерево групп не инициализировано")
+            return
+            
+        selected_items = self.groups_tree.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "Ошибка", "Выберите группу для удаления!")
+            return
+        
+        item = selected_items[0]
+        name = item.text(0)
+        
+        reply = QMessageBox.question(
+            self,
+            "Подтверждение",
+            f"Удалить группу '{name}'?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if reply == QMessageBox.No:
+            return
+        
+        parent = item.parent()
+        if parent:
+            parent.removeChild(item)
+        else:
+            index = self.groups_tree.indexOfTopLevelItem(item)
+            self.groups_tree.takeTopLevelItem(index)
+        
+        self._save_groups()
+        self._append_log(f"🗑️ Удалена группа: {name}")
 
     def _rename_group(self):
-        """Переименовать выбранную группу (заглушка)"""
-        self._append_log("ℹ️ Переименование группы (в разработке)")
+        """Переименовать выбранную группу"""
+        if not hasattr(self, "groups_tree") or self.groups_tree is None:
+            self._append_log("❌ Дерево групп не инициализировано")
+            return
+            
+        from PySide6.QtWidgets import QInputDialog
+        
+        selected_items = self.groups_tree.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "Ошибка", "Выберите группу для переименования!")
+            return
+        
+        item = selected_items[0]
+        old_name = item.text(0)
+        
+        new_name, ok = QInputDialog.getText(
+            self,
+            "Переименовать",
+            "Новое название:",
+            text=old_name
+        )
+        
+        if ok and new_name.strip() and new_name != old_name:
+            item.setText(0, new_name.strip())
+            self._save_groups()
+            self._append_log(f"✏️ Переименовано: '{old_name}' → '{new_name.strip()}'")
+
+    def _on_sort_groups(self):
+        """Сортировать группы по алфавиту"""
+        if not hasattr(self, "groups_tree") or self.groups_tree is None:
+            return
+        self.groups_tree.sortItems(0, Qt.AscendingOrder)
+        self._save_groups()
+        self._append_log("📋 Группы отсортированы")
+
+    def _on_group_double_clicked(self, item, column):
+        """Переименовать группу при двойном клике"""
+        if not item:
+            return
+        self._rename_group()
+
+    def _on_groups_context_menu(self, position):
+        """Контекстное меню для дерева групп"""
+        if not hasattr(self, "groups_tree") or self.groups_tree is None:
+            return
+            
+        menu = QMenu()
+        
+        selected_items = self.groups_tree.selectedItems()
+        
+        action_create = menu.addAction("➕ Создать группу")
+        action_create.triggered.connect(self._create_group)
+        
+        if selected_items:
+            action_rename = menu.addAction("✏️ Переименовать")
+            action_rename.triggered.connect(self._rename_group)
+            
+            action_delete = menu.addAction("🗑️ Удалить")
+            action_delete.triggered.connect(self._delete_group)
+            
+            menu.addSeparator()
+            
+            action_move_to_group = menu.addAction("📂 Переместить выделенные фразы в группу")
+            action_move_to_group.triggered.connect(lambda: self._move_phrases_to_group(selected_items[0]))
+        
+        menu.exec_(self.groups_tree.viewport().mapToGlobal(position))
+
+    def _move_phrases_to_group(self, group_item):
+        """Переместить выделенные фразы в группу"""
+        if not group_item:
+            return
+            
+        group_name = group_item.text(0)
+        group_id = group_item.data(0, Qt.UserRole)
+        
+        selected_rows = []
+        for row in range(self.table.rowCount()):
+            checkbox = self._get_checkbox(row)
+            if checkbox and checkbox.isChecked():
+                phrase_item = self.table.item(row, 2)
+                if phrase_item:
+                    phrase = phrase_item.text()
+                    selected_rows.append((row, phrase))
+        
+        if not selected_rows:
+            QMessageBox.warning(self, "Ошибка", "Выберите фразы для перемещения!")
+            return
+        
+        self._append_log(f"📂 Перемещено {len(selected_rows)} фраз в группу '{group_name}'")
+        QMessageBox.information(self, "Готово", f"Перемещено {len(selected_rows)} фраз")
 
     def _move_group_up(self):
         """Переместить группу вверх (заглушка)"""
